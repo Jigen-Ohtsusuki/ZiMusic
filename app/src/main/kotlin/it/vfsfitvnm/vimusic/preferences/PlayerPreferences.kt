@@ -36,7 +36,6 @@ object PlayerPreferences : GlobalPreferencesHolder() {
     var stopWhenClosed by boolean(false)
     var stopOnMinimumVolume by boolean(true)
 
-    var isShowingLyrics by boolean(false)
     var isShowingSynchronizedLyrics by boolean(false)
 
     var isShowingPrevButtonCollapsed by boolean(false)

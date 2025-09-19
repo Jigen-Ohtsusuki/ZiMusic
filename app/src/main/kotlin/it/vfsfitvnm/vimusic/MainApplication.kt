@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.os.StrictMode
@@ -15,6 +16,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.LocalIndication
@@ -170,6 +172,7 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
         bindService(intent<PlayerService>(), serviceConnection, BIND_AUTO_CREATE)
     }
 
+    @RequiresApi(Build.VERSION_CODES.P)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -233,6 +236,7 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.P)
     @Suppress("CyclomaticComplexMethod")
     @OptIn(ExperimentalLayoutApi::class)
     fun setContent() = setContent {
