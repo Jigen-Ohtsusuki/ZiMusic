@@ -3,51 +3,37 @@ package it.vfsfitvnm.vimusic.ui.screens.player
 import android.app.SearchManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
+import android.graphics.Bitmap
+import android.net.Uri
+import android.os.Build
+import android.util.Log
+import androidx.annotation.RequiresApi
+import androidx.compose.animation.*
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ripple
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.pointerInput
@@ -60,12 +46,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import androidx.media3.common.MediaMetadata
+import coil3.imageLoader
+import coil3.request.ImageRequest
+import coil3.request.allowHardware
+import coil3.toBitmap
 import com.valentinilk.shimmer.shimmer
 import it.vfsfitvnm.core.ui.LocalAppearance
 import it.vfsfitvnm.core.ui.onOverlay
 import it.vfsfitvnm.core.ui.onOverlayShimmer
-import it.vfsfitvnm.core.ui.overlay
 import it.vfsfitvnm.core.ui.utils.dp
+import it.vfsfitvnm.core.ui.utils.roundedShape
 import it.vfsfitvnm.providers.innertube.Innertube
 import it.vfsfitvnm.providers.innertube.models.bodies.NextBody
 import it.vfsfitvnm.providers.innertube.requests.lyrics
@@ -87,34 +77,14 @@ import it.vfsfitvnm.vimusic.query
 import it.vfsfitvnm.vimusic.service.LOCAL_KEY_PREFIX
 import it.vfsfitvnm.vimusic.transaction
 import it.vfsfitvnm.vimusic.ui.components.LocalMenuState
-import it.vfsfitvnm.vimusic.ui.components.themed.CircularProgressIndicator
-import it.vfsfitvnm.vimusic.ui.components.themed.DefaultDialog
-import it.vfsfitvnm.vimusic.ui.components.themed.Menu
-import it.vfsfitvnm.vimusic.ui.components.themed.MenuEntry
-import it.vfsfitvnm.vimusic.ui.components.themed.TextField
-import it.vfsfitvnm.vimusic.ui.components.themed.TextFieldDialog
-import it.vfsfitvnm.vimusic.ui.components.themed.TextPlaceholder
-import it.vfsfitvnm.vimusic.ui.components.themed.ValueSelectorDialogBody
+import it.vfsfitvnm.vimusic.ui.components.themed.*
 import it.vfsfitvnm.vimusic.ui.modifiers.verticalFadingEdge
-import it.vfsfitvnm.vimusic.utils.LyricsCacheManager
-import it.vfsfitvnm.vimusic.utils.SynchronizedLyrics
-import it.vfsfitvnm.vimusic.utils.SynchronizedLyricsState
-import it.vfsfitvnm.vimusic.utils.center
-import it.vfsfitvnm.vimusic.utils.color
-import it.vfsfitvnm.vimusic.utils.isInPip
-import it.vfsfitvnm.vimusic.utils.medium
-import it.vfsfitvnm.vimusic.utils.semiBold
-import it.vfsfitvnm.vimusic.utils.toast
+import it.vfsfitvnm.vimusic.utils.*
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.cancellable
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
@@ -123,28 +93,23 @@ import kotlin.time.Duration.Companion.seconds
 private const val UPDATE_DELAY = 50L
 private val wordSyncCache = mutableMapOf<String, LyricsPlusSyncManager>()
 
-// Helper function to check if text is word-level JSON
 private fun isWordLevelJson(text: String?): Boolean {
     if (text.isNullOrBlank()) return false
     val trimmed = text.trim()
     return trimmed.startsWith("[") && trimmed.endsWith("]") &&
-        trimmed.length > 10 && // More robust check
+        trimmed.length > 10 &&
         !trimmed.contains('\n') &&
-        trimmed.contains("words") // Additional check for word-level structure
+        trimmed.contains("words")
 }
 
-// Helper function to check for LRC format to prevent flicker
 private fun isLrcFormat(text: String?): Boolean {
     if (text.isNullOrBlank()) return false
-    // A simple but effective heuristic: check for the presence of a timestamp tag.
     return text.contains(Regex("\\[\\d{2}:\\d{2}[.:]\\d{2,3}]"))
 }
 
-// Helper function to safely parse word-level lyrics
 private fun parseWordLevelLyrics(jsonText: String): List<LyricLine>? {
     return try {
         val parsed = Json.decodeFromString<List<LyricLine>>(jsonText)
-        // Validate it has actual word data
         if (parsed.any { it.words.isNotEmpty() }) parsed else null
     } catch (e: Exception) {
         e.printStackTrace()
@@ -152,7 +117,6 @@ private fun parseWordLevelLyrics(jsonText: String): List<LyricLine>? {
     }
 }
 
-// Check cached word-level lyrics first
 private fun getCachedWordLevelLyrics(context: android.content.Context, mediaId: String): List<LyricLine>? {
     return try {
         val cacheFile = File(File(context.cacheDir, "lyrics"), "${mediaId}_word.json")
@@ -166,6 +130,7 @@ private fun getCachedWordLevelLyrics(context: android.content.Context, mediaId: 
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.P)
 @Composable
 fun Lyrics(
     mediaId: String,
@@ -176,7 +141,6 @@ fun Lyrics(
     ensureSongInserted: () -> Unit,
     modifier: Modifier = Modifier,
     onMenuLaunch: () -> Unit = { },
-    onOpenDialog: (() -> Unit)? = null,
     shouldShowSynchronizedLyrics: Boolean = PlayerPreferences.isShowingSynchronizedLyrics,
     setShouldShowSynchronizedLyrics: (Boolean) -> Unit = {
         PlayerPreferences.isShowingSynchronizedLyrics = it
@@ -184,27 +148,28 @@ fun Lyrics(
     shouldKeepScreenAwake: Boolean = PlayerPreferences.lyricsKeepScreenAwake,
     shouldUpdateLyrics: Boolean = true,
     showControls: Boolean = true
-) = AnimatedVisibility(
-    visible = isDisplayed,
-    enter = fadeIn(),
-    exit = fadeOut()
 ) {
     val currentEnsureSongInserted by rememberUpdatedState(ensureSongInserted)
     val currentMediaMetadataProvider by rememberUpdatedState(mediaMetadataProvider)
     val currentDurationProvider by rememberUpdatedState(durationProvider)
 
-    val (colorPalette, typography) = LocalAppearance.current
+    val appearance = LocalAppearance.current
+    val (colorPalette, typography) = appearance
+
     val context = LocalContext.current
     val menuState = LocalMenuState.current
     val binder = LocalPlayerServiceBinder.current
     val density = LocalDensity.current
     val view = LocalView.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var isSelectingForShare by remember(mediaId) { mutableStateOf(false) }
+    val selectedTimestamps = remember(mediaId) { mutableStateListOf<Long>() }
 
     val pip = isInPip()
 
     var lyrics by remember { mutableStateOf<Lyrics?>(null) }
 
-    // Priority: Word-level > Line-level > Unsync
     val showSynchronizedLyrics = remember(shouldShowSynchronizedLyrics, lyrics) {
         shouldShowSynchronizedLyrics && (
             isWordLevelJson(lyrics?.synced) ||
@@ -217,32 +182,26 @@ fun Lyrics(
     var picking by remember(mediaId, shouldShowSynchronizedLyrics) { mutableStateOf(false) }
     var error by remember(mediaId, shouldShowSynchronizedLyrics) { mutableStateOf(false) }
 
-    // Get text with proper priority: word-level first, then line-level, then fixed
     val text = remember(lyrics, showSynchronizedLyrics) {
         when {
             showSynchronizedLyrics -> {
-                // Priority 1: Word-level JSON in synced
                 val syncedText = lyrics?.synced
                 if (isWordLevelJson(syncedText)) {
                     syncedText
                 } else {
-                    // Priority 2: Word-level JSON in fixed
                     val fixedText = lyrics?.fixed
                     if (isWordLevelJson(fixedText)) {
                         fixedText
                     } else {
-                        // Priority 3: Line-level LRC in synced
                         if (!syncedText.isNullOrBlank()) syncedText else null
                     }
                 }
             }
             else -> {
-                // For unsynchronized mode, prefer non-JSON fixed text
                 val fixedText = lyrics?.fixed
                 if (!isWordLevelJson(fixedText) && !fixedText.isNullOrBlank()) {
                     fixedText
                 } else {
-                    // Fallback to synced if it's not JSON
                     val syncedText = lyrics?.synced
                     if (!isWordLevelJson(syncedText)) syncedText else null
                 }
@@ -252,15 +211,12 @@ fun Lyrics(
 
     var invalidLrc by remember(text) { mutableStateOf(false) }
 
-    // This Saver correctly handles the MutableState object, fixing the type mismatch.
     val lyricsPlusSyncManagerStateSaver = remember(binder) {
         Saver<MutableState<LyricsPlusSyncManager?>, String>(
             save = { state ->
-                // Get the value from the state and serialize it to a JSON string
                 state.value?.let { manager -> Json.encodeToString(manager.getLyrics()) } ?: ""
             },
             restore = { jsonString ->
-                // Deserialize the string to get the manager object
                 val restoredManager = if (jsonString.isNotBlank()) {
                     val lyricsList = Json.decodeFromString<List<LyricLine>>(jsonString)
                     LyricsPlusSyncManager(
@@ -270,7 +226,6 @@ fun Lyrics(
                 } else {
                     null
                 }
-                // Restore it back into a new MutableState
                 mutableStateOf(restoredManager)
             }
         )
@@ -279,7 +234,7 @@ fun Lyrics(
     var wordSyncedManager by rememberSaveable(
         mediaId,
         shouldShowSynchronizedLyrics,
-        saver = lyricsPlusSyncManagerStateSaver // Use the state-aware saver
+        saver = lyricsPlusSyncManagerStateSaver
     ) {
         mutableStateOf(null)
     }
@@ -296,15 +251,12 @@ fun Lyrics(
         }
     }
 
-    // Only trigger on mediaId change, not on player state changes
     LaunchedEffect(mediaId, shouldUpdateLyrics) {
         runCatching {
             withContext(Dispatchers.IO) {
-                // Reset state
                 wordSyncedManager = null
                 wordSyncedAvailable = false
 
-                // Check cached word-level lyrics first
                 val cachedWordLyrics = getCachedWordLevelLyrics(context, mediaId)
                 if (cachedWordLyrics != null) {
                     wordSyncedAvailable = true
@@ -315,7 +267,6 @@ fun Lyrics(
                     wordSyncCache[mediaId] = manager
                     wordSyncedManager = manager
 
-                    // Save to database if not exists
                     val jsonString = Json.encodeToString(cachedWordLyrics)
                     Database.instance.lyrics(mediaId).distinctUntilChanged().cancellable().collect { currentLyrics ->
                         if (currentLyrics?.synced != jsonString) {
@@ -338,14 +289,12 @@ fun Lyrics(
                         return@collect
                     }
                 } else {
-                    // Check database
                     Database.instance
                         .lyrics(mediaId)
                         .distinctUntilChanged()
                         .cancellable()
                         .collect { currentLyrics ->
 
-                            // Check if we have word-level in database
                             val wordLevelText = when {
                                 isWordLevelJson(currentLyrics?.synced) -> currentLyrics?.synced
                                 isWordLevelJson(currentLyrics?.fixed) -> currentLyrics?.fixed
@@ -367,14 +316,12 @@ fun Lyrics(
                                 }
                             }
 
-                            // Check if we have sufficient lyrics and don't need to fetch
                             val hasFixedLyrics = !currentLyrics?.fixed.isNullOrBlank()
                             val hasSyncedLyrics = !currentLyrics?.synced.isNullOrBlank()
 
                             if (!shouldUpdateLyrics || (hasFixedLyrics && hasSyncedLyrics)) {
                                 lyrics = currentLyrics
                             } else {
-                                // Need to fetch lyrics
                                 val mediaMetadata = currentMediaMetadataProvider()
                                 var duration = withContext(Dispatchers.Main) {
                                     currentDurationProvider()
@@ -396,7 +343,6 @@ fun Lyrics(
                                 lyrics = null
                                 error = false
 
-                                // Try word-level first
                                 val wordLevelLyrics = try {
                                     LyricsPlus.fetchLyrics(
                                         baseUrl = BuildConfig.LYRICS_API_BASE,
@@ -412,7 +358,6 @@ fun Lyrics(
                                 val hasActualWords = wordLevelLyrics?.any { it.words.isNotEmpty() } == true
 
                                 if (hasActualWords) {
-                                    // Got word-level lyrics
                                     wordSyncedAvailable = true
                                     val nonNullWordLevelLyrics = wordLevelLyrics
 
@@ -424,10 +369,8 @@ fun Lyrics(
                                     }
 
                                     if (jsonString != null) {
-                                        // Cache the word-level lyrics
                                         LyricsCacheManager.save(context, mediaId, jsonString)
 
-                                        // Save word-level to synced field
                                         val newLyrics = Lyrics(
                                             songId = mediaId,
                                             fixed = currentLyrics?.fixed,
@@ -448,9 +391,9 @@ fun Lyrics(
                                         )
                                         wordSyncCache[mediaId] = manager
                                         wordSyncedManager = manager
+                                        lyrics = newLyrics
                                     }
                                 } else {
-                                    // Fallback to line-level lyrics
                                     wordSyncedAvailable = false
 
                                     val fixed = currentLyrics?.fixed ?: try {
@@ -506,7 +449,6 @@ fun Lyrics(
                                 }
                             }
 
-                            // Update error state based on priority
                             error = when {
                                 shouldShowSynchronizedLyrics -> {
                                     !wordSyncedAvailable &&
@@ -595,10 +537,9 @@ fun Lyrics(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .pointerInput(Unit) {
-                detectTapGestures(onTap = { onDismiss() })
+                detectTapGestures(onTap = { if (!isSelectingForShare) onDismiss() })
             }
-            .fillMaxSize()
-            .background(colorPalette.overlay)
+            .background(Color.Transparent)
     ) {
         val animatedHeight by animateDpAsState(
             targetValue = this.maxHeight,
@@ -616,7 +557,7 @@ fun Lyrics(
                     if (shouldShowSynchronizedLyrics) R.string.synchronized_lyrics_not_available
                     else R.string.lyrics_not_available
                 ),
-                style = typography.xs.center.medium.color(colorPalette.onOverlay),
+                style = typography.xs.center.bold.color(colorPalette.onOverlay),
                 modifier = Modifier
                     .background(Color.Black.copy(0.4f))
                     .padding(all = 8.dp)
@@ -634,7 +575,7 @@ fun Lyrics(
         ) {
             BasicText(
                 text = stringResource(R.string.invalid_synchronized_lyrics),
-                style = typography.xs.center.medium.color(colorPalette.onOverlay),
+                style = typography.xs.center.bold.color(colorPalette.onOverlay),
                 modifier = Modifier
                     .background(Color.Black.copy(0.4f))
                     .padding(all = 8.dp)
@@ -649,7 +590,6 @@ fun Lyrics(
             val isJson = isWordLevelJson(syncedText)
 
             if (isJson) {
-                // If it's word-level JSON, provide default state
                 SynchronizedLyricsState(sentences = null, offset = 0L)
             } else {
                 val file = syncedText?.let { LrcParser.parse(it)?.toLrcFile() }
@@ -678,22 +618,28 @@ fun Lyrics(
             label = ""
         ) { synchronized ->
             when {
-                // Case 1: Word-level sync is available and requested
                 synchronized && wordSyncedAvailable && wordSyncedManager != null -> {
-                    LaunchedEffect(Unit) {
+                    LaunchedEffect(wordSyncedManager, isDisplayed) {
+                        if (isDisplayed && wordSyncedManager != null) {
+                            wordSyncedManager?.forceSync()
+                        }
+                    }
+
+                    LaunchedEffect(wordSyncedManager) {
+                        wordSyncedManager?.updatePosition()
                         while (isActive) {
-                            wordSyncedManager?.updatePosition()
                             delay(UPDATE_DELAY)
+                            wordSyncedManager?.updatePosition()
                         }
                     }
 
                     WordSyncedLyrics(
                         manager = wordSyncedManager!!,
-                        isVisible = isDisplayed
+                        isVisible = isDisplayed,
+                        binder = binder
                     )
                 }
 
-                // Case 2: Line-level sync is parsed and ready
                 synchronized && synchronizedLyrics != null -> {
                     val lazyListState = rememberLazyListState()
 
@@ -701,25 +647,33 @@ fun Lyrics(
                         val currentSynchronizedLyrics = synchronizedLyrics
                         val centerOffset = with(density) { (-animatedHeight / 3).roundToPx() }
 
-                        lazyListState.animateScrollToItem(
-                            index = currentSynchronizedLyrics.index + 1,
-                            scrollOffset = centerOffset
-                        )
-
-                        while (true) {
-                            delay(UPDATE_DELAY)
-                            if (!currentSynchronizedLyrics.update()) continue
-
+                        if (!lazyListState.isScrollInProgress) {
                             lazyListState.animateScrollToItem(
                                 index = currentSynchronizedLyrics.index + 1,
                                 scrollOffset = centerOffset
                             )
                         }
+
+                        while (true) {
+                            delay(UPDATE_DELAY)
+                            if (!currentSynchronizedLyrics.update()) continue
+
+                            if (!lazyListState.isScrollInProgress) {
+                                lazyListState.animateScrollToItem(
+                                    index = currentSynchronizedLyrics.index + 1,
+                                    scrollOffset = centerOffset
+                                )
+                            }
+                        }
+                    }
+
+                    val lyricsLines = remember(synchronizedLyrics) {
+                        synchronizedLyrics.sentences.entries.toImmutableList()
                     }
 
                     LazyColumn(
                         state = lazyListState,
-                        userScrollEnabled = false,
+                        userScrollEnabled = true,
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                         modifier = Modifier
@@ -727,54 +681,113 @@ fun Lyrics(
                             .fillMaxWidth()
                     ) {
                         item(key = "header", contentType = 0) {
-                            Spacer(modifier = Modifier.height(maxHeight))
+                            Spacer(modifier = Modifier.height(maxHeight / 2))
                         }
 
                         itemsIndexed(
-                            items = synchronizedLyrics.sentences.values.toImmutableList()
-                        ) { index, sentence ->
-                            val color by animateColorAsState(
-                                if (index == synchronizedLyrics.index) Color.White
-                                else colorPalette.textDisabled
+                            items = lyricsLines,
+                            key = { _, (timestamp, _) -> timestamp }
+                        ) { index, (timestamp, sentence) ->
+                            val isSelected = remember(selectedTimestamps.size) { selectedTimestamps.contains(timestamp) }
+
+                            val isSelectable = remember(selectedTimestamps.size) {
+                                when {
+                                    isSelected -> true
+                                    selectedTimestamps.size >= 6 -> false
+                                    selectedTimestamps.isEmpty() -> true
+                                    else -> {
+                                        val selectedIndices = selectedTimestamps.mapNotNull { ts -> lyricsLines.find { it.key == ts }?.let { lyricsLines.indexOf(it) } }
+                                        if (selectedIndices.isEmpty()) {
+                                            true
+                                        } else {
+                                            val minIndex = selectedIndices.minOrNull()!!
+                                            val maxIndex = selectedIndices.maxOrNull()!!
+                                            index == minIndex - 1 || index == maxIndex + 1
+                                        }
+                                    }
+                                }
+                            }
+
+                            val animatedLineBackgroundColor by animateColorAsState(
+                                targetValue = if (isSelected) colorPalette.accent.copy(alpha = 0.25f) else Color.Transparent,
+                                label = "lineSelectionBackgroundColor"
                             )
 
-                            if (sentence.isBlank()) {
-                                Image(
-                                    painter = painterResource(R.drawable.musical_notes),
-                                    contentDescription = null,
-                                    colorFilter = ColorFilter.tint(color),
-                                    modifier = Modifier
-                                        .padding(vertical = 4.dp, horizontal = 32.dp)
-                                        .size(typography.xs.fontSize.dp)
-                                )
-                            } else {
-                                BasicText(
-                                    text = sentence,
-                                    style = typography.xs.center.medium.color(color),
-                                    modifier = Modifier.padding(vertical = 4.dp, horizontal = 32.dp)
-                                )
+                            val activeColor = if (colorPalette.isDark) Color.White else Color.Black
+                            val inactiveColor = if (colorPalette.isDark) colorPalette.textDisabled else Color.Gray
+
+                            val color by animateColorAsState(
+                                if (index == synchronizedLyrics.index && !isSelectingForShare) activeColor
+                                else inactiveColor
+                            )
+
+                            val itemAlpha by animateFloatAsState(
+                                targetValue = if (isSelectingForShare && !isSelectable) 0.5f else 1.0f,
+                                label = "selectableAlpha"
+                            )
+
+                            val seekPosition = remember(timestamp, lyricsState.offset, lyrics?.startTime) {
+                                timestamp - lyricsState.offset + (lyrics?.startTime ?: 0L)
+                            }
+
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp)
+                                    .alpha(itemAlpha)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(animatedLineBackgroundColor)
+                                    .clickable(
+                                        enabled = !isSelectingForShare || isSelectable,
+                                        onClick = {
+                                            if (isSelectingForShare) {
+                                                if (isSelected) {
+                                                    selectedTimestamps.remove(timestamp)
+                                                } else {
+                                                    selectedTimestamps.add(timestamp)
+                                                }
+                                            } else {
+                                                binder?.player?.seekTo(seekPosition)
+                                            }
+                                        }
+                                    )
+                            ) {
+                                if (sentence.isBlank()) {
+                                    Image(
+                                        painter = painterResource(R.drawable.musical_notes),
+                                        contentDescription = null,
+                                        colorFilter = ColorFilter.tint(color),
+                                        modifier = Modifier
+                                            .padding(vertical = 8.dp, horizontal = 16.dp)
+                                            .size(typography.l.fontSize.dp)
+                                    )
+                                } else {
+                                    BasicText(
+                                        text = sentence,
+                                        style = typography.l.center.bold.color(color),
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)
+                                    )
+                                }
                             }
                         }
 
                         item(key = "footer", contentType = 0) {
-                            Spacer(modifier = Modifier.height(maxHeight))
+                            Spacer(modifier = Modifier.height(maxHeight / 2))
                         }
                     }
                 }
 
-                // Case 3: Unsynchronized mode is explicitly selected
                 !synchronized -> {
-                    // Unsynchronized mode - show non-JSON text.
-                    // We add isLrcFormat check as a final safeguard against flicker.
                     val displayText = if (!isWordLevelJson(text) && !isLrcFormat(text) && !text.isNullOrBlank()) {
                         text
                     } else {
-                        "" // Do not show anything if it's JSON or LRC format
+                        ""
                     }
 
                     BasicText(
                         text = displayText,
-                        style = typography.xs.center.medium.color(colorPalette.onOverlay),
+                        style = typography.l.center.bold.color(if (colorPalette.isDark) Color.White else Color.Black),
                         modifier = Modifier
                             .verticalFadingEdge()
                             .verticalScroll(rememberScrollState())
@@ -798,148 +811,299 @@ fun Lyrics(
         }
 
         if (showControls) {
-            if (onOpenDialog != null) Image(
-                painter = painterResource(R.drawable.expand),
-                contentDescription = null,
-                colorFilter = ColorFilter.tint(colorPalette.onOverlay),
+            Row(
                 modifier = Modifier
-                    .padding(all = 4.dp)
-                    .clickable(
-                        indication = ripple(bounded = false),
-                        interactionSource = remember { MutableInteractionSource() },
-                        onClick = {
-                            onOpenDialog()
-                        }
-                    )
-                    .padding(all = 8.dp)
-                    .size(20.dp)
-                    .align(Alignment.BottomStart)
-            )
-
-            Image(
-                painter = painterResource(R.drawable.ellipsis_horizontal),
-                contentDescription = null,
-                colorFilter = ColorFilter.tint(colorPalette.onOverlay),
-                modifier = Modifier
-                    .padding(all = 4.dp)
-                    .clickable(
-                        indication = ripple(bounded = false),
-                        interactionSource = remember { MutableInteractionSource() },
-                        onClick = {
-                            onMenuLaunch()
-                            menuState.display {
-                                Menu {
-                                    MenuEntry(
-                                        icon = R.drawable.time,
-                                        text = stringResource(
-                                            if (shouldShowSynchronizedLyrics) R.string.show_unsynchronized_lyrics
-                                            else R.string.show_synchronized_lyrics
-                                        ),
-                                        onClick = {
-                                            menuState.hide()
-                                            setShouldShowSynchronizedLyrics(!shouldShowSynchronizedLyrics)
-                                        }
-                                    )
-
-                                    MenuEntry(
-                                        icon = R.drawable.pencil,
-                                        text = stringResource(R.string.edit_lyrics),
-                                        onClick = {
-                                            menuState.hide()
-                                            editing = true
-                                        }
-                                    )
-
-                                    MenuEntry(
-                                        icon = R.drawable.search,
-                                        text = stringResource(R.string.search_lyrics_online),
-                                        onClick = {
-                                            menuState.hide()
-                                            val mediaMetadata = currentMediaMetadataProvider()
-
-                                            try {
-                                                context.startActivity(
-                                                    Intent(Intent.ACTION_WEB_SEARCH).apply {
-                                                        putExtra(
-                                                            SearchManager.QUERY,
-                                                            "${mediaMetadata.title} ${mediaMetadata.artist} lyrics"
-                                                        )
-                                                    }
-                                                )
-                                            } catch (_: ActivityNotFoundException) {
-                                                context.toast(context.getString(R.string.no_browser_installed))
-                                            }
-                                        }
-                                    )
-
-                                    MenuEntry(
-                                        icon = R.drawable.sync,
-                                        text = stringResource(R.string.refetch_lyrics),
-                                        enabled = lyrics != null,
-                                        onClick = {
-                                            menuState.hide()
-
-                                            // When refetching, clear the file cache for this song.
-                                            try {
-                                                File(File(context.cacheDir, "lyrics"), "${mediaId}_word.json").delete()
-                                            } catch (e: Exception) { e.printStackTrace() }
-
-                                            // Clear word sync cache
-                                            wordSyncCache.remove(mediaId)
-                                            wordSyncedManager = null
-                                            wordSyncedAvailable = false
-
-                                            transaction {
-                                                runCatching {
-                                                    currentEnsureSongInserted()
-
-                                                    // Clear both fixed and synced to force refetch
-                                                    Database.instance.upsert(
-                                                        Lyrics(
-                                                            songId = mediaId,
-                                                            fixed = null,
-                                                            synced = null
-                                                        )
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    )
-
-                                    if (shouldShowSynchronizedLyrics) {
+                    .align(Alignment.BottomEnd)
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.ellipsis_horizontal),
+                    contentDescription = null,
+                    colorFilter = ColorFilter.tint(if (colorPalette.isDark) colorPalette.onOverlay else Color.Black),
+                    modifier = Modifier
+                        .clickable(
+                            indication = ripple(bounded = false),
+                            interactionSource = remember { MutableInteractionSource() },
+                            onClick = {
+                                onMenuLaunch()
+                                menuState.display {
+                                    Menu {
                                         MenuEntry(
-                                            icon = R.drawable.download,
-                                            text = stringResource(R.string.pick_from_lrclib),
+                                            icon = R.drawable.share_social,
+                                            text = stringResource(R.string.share_lyrics),
                                             onClick = {
                                                 menuState.hide()
-                                                picking = true
+                                                if (isWordLevelJson(text)) {
+                                                    context.toast("Sharing is not supported for word-synced lyrics yet.")
+                                                } else {
+                                                    selectedTimestamps.clear()
+                                                    isSelectingForShare = true
+                                                }
                                             }
                                         )
+
                                         MenuEntry(
-                                            icon = R.drawable.play_skip_forward,
-                                            text = stringResource(R.string.set_lyrics_start_offset),
-                                            secondaryText = stringResource(
-                                                R.string.set_lyrics_start_offset_description
+                                            icon = R.drawable.time,
+                                            text = stringResource(
+                                                if (shouldShowSynchronizedLyrics) R.string.show_unsynchronized_lyrics
+                                                else R.string.show_synchronized_lyrics
                                             ),
                                             onClick = {
                                                 menuState.hide()
-                                                lyrics?.let {
-                                                    val startTime = binder?.player?.currentPosition
-                                                    query {
-                                                        Database.instance.upsert(it.copy(startTime = startTime))
+                                                setShouldShowSynchronizedLyrics(!shouldShowSynchronizedLyrics)
+                                            }
+                                        )
+
+                                        MenuEntry(
+                                            icon = R.drawable.pencil,
+                                            text = stringResource(R.string.edit_lyrics),
+                                            onClick = {
+                                                menuState.hide()
+                                                editing = true
+                                            }
+                                        )
+
+                                        MenuEntry(
+                                            icon = R.drawable.search,
+                                            text = stringResource(R.string.search_lyrics_online),
+                                            onClick = {
+                                                menuState.hide()
+                                                val mediaMetadata = currentMediaMetadataProvider()
+                                                try {
+                                                    context.startActivity(
+                                                        Intent(Intent.ACTION_WEB_SEARCH).apply {
+                                                            putExtra(
+                                                                SearchManager.QUERY,
+                                                                "${mediaMetadata.title} ${mediaMetadata.artist} lyrics"
+                                                            )
+                                                        }
+                                                    )
+                                                } catch (_: ActivityNotFoundException) {
+                                                    context.toast(context.getString(R.string.no_browser_installed))
+                                                }
+                                            }
+                                        )
+
+                                        MenuEntry(
+                                            icon = R.drawable.sync,
+                                            text = stringResource(R.string.refetch_lyrics),
+                                            enabled = lyrics != null,
+                                            onClick = {
+                                                menuState.hide()
+                                                try {
+                                                    File(
+                                                        File(context.cacheDir, "lyrics"),
+                                                        "${mediaId}_word.json"
+                                                    ).delete()
+                                                } catch (e: Exception) {
+                                                    e.printStackTrace()
+                                                }
+
+                                                wordSyncCache.remove(mediaId)
+                                                wordSyncedManager = null
+                                                wordSyncedAvailable = false
+
+                                                transaction {
+                                                    runCatching {
+                                                        currentEnsureSongInserted()
+
+                                                        Database.instance.upsert(
+                                                            Lyrics(
+                                                                songId = mediaId,
+                                                                fixed = null,
+                                                                synced = null
+                                                            )
+                                                        )
                                                     }
                                                 }
                                             }
                                         )
+
+                                        if (shouldShowSynchronizedLyrics) {
+                                            MenuEntry(
+                                                icon = R.drawable.download,
+                                                text = stringResource(R.string.pick_from_lrclib),
+                                                onClick = {
+                                                    menuState.hide()
+                                                    picking = true
+                                                }
+                                            )
+                                            MenuEntry(
+                                                icon = R.drawable.play_skip_forward,
+                                                text = stringResource(R.string.set_lyrics_start_offset),
+                                                secondaryText = stringResource(
+                                                    R.string.set_lyrics_start_offset_description
+                                                ),
+                                                onClick = {
+                                                    menuState.hide()
+                                                    lyrics?.let {
+                                                        val startTime =
+                                                            binder?.player?.currentPosition
+                                                        query {
+                                                            Database.instance.upsert(
+                                                                it.copy(
+                                                                    startTime = startTime
+                                                                )
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        )
+                        .padding(all = 8.dp)
+                        .size(20.dp)
+                )
+
+                Image(
+                    painter = painterResource(R.drawable.close),
+                    contentDescription = stringResource(R.string.close),
+                    colorFilter = ColorFilter.tint(if (colorPalette.isDark) colorPalette.onOverlay else Color.Black),
+                    modifier = Modifier
+                        .clickable(
+                            indication = ripple(bounded = false),
+                            interactionSource = remember { MutableInteractionSource() },
+                            onClick = onDismiss
+                        )
+                        .padding(all = 8.dp)
+                        .size(20.dp)
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = isSelectingForShare,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 24.dp),
+            enter = slideInVertically { it },
+            exit = slideOutVertically { it }
+        ) {
+            val isEnabled = selectedTimestamps.isNotEmpty()
+
+            @Composable
+            fun Buttons() {
+                suspend fun generateLyricsBitmap(): Bitmap? {
+                    try {
+                        val synchronizedLyrics = synchronizedLyrics ?: return null
+                        val mediaMetadata = currentMediaMetadataProvider()
+                        val artworkUri = mediaMetadata.artworkUri
+
+                        val lyricsMap = synchronizedLyrics.sentences
+                        val sortedTimestamps = selectedTimestamps.sorted()
+                        val lyricsToShare = sortedTimestamps.mapNotNull { lyricsMap[it] }.joinToString("\n")
+
+                        if (lyricsToShare.isBlank()) {
+                            context.toast("Please select some lyrics to share.")
+                            return null
+                        }
+
+                        val highQualityArtworkUri = artworkUri?.let {
+                            val originalUrl = it.toString()
+                            if (originalUrl.contains("=w")) {
+                                Uri.parse(originalUrl.replace(Regex("=w\\d+-h\\d+"), "=w1080-h1080"))
+                            } else it
+                        }
+
+                        val albumArtBitmap: Bitmap? = highQualityArtworkUri?.let { uri ->
+                            val request = ImageRequest.Builder(context)
+                                .data(uri)
+                                .allowHardware(false)
+                                .build()
+                            context.imageLoader.execute(request).image?.toBitmap()
+                        }
+
+                        return captureComposableAsBitmap(context, appearance) {
+                            ShareCard(
+                                lyrics = lyricsToShare,
+                                songTitle = mediaMetadata.title?.toString() ?: "Unknown Title",
+                                songArtist = mediaMetadata.artist?.toString() ?: "Unknown Artist",
+                                albumArtBitmap = albumArtBitmap
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.e("LyricsShare", "Bitmap generation failed", e)
+                        context.toast("Failed to generate image: ${e.message}")
+                        return null
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Color.Black.copy(alpha = 0.7f))
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SecondaryTextButton(
+                        text = stringResource(id = android.R.string.cancel),
+                        onClick = {
+                            isSelectingForShare = false
+                            selectedTimestamps.clear()
+                        }
+                    )
+
+                    IconButton(
+                        enabled = isEnabled,
+                        onClick = {
+                            coroutineScope.launch {
+                                val bitmap = generateLyricsBitmap()
+                                if (bitmap != null) {
+                                    val mediaMetadata = currentMediaMetadataProvider()
+                                    val displayName = "${mediaMetadata.artist} - ${mediaMetadata.title}"
+                                    val success = saveBitmapToGallery(context, bitmap, displayName)
+                                    if (success) {
+                                        context.toast("Saved to Gallery")
+                                        isSelectingForShare = false
+                                        selectedTimestamps.clear()
+                                    } else {
+                                        context.toast("Failed to save image")
                                     }
                                 }
                             }
                         }
-                    )
-                    .padding(all = 8.dp)
-                    .size(20.dp)
-                    .align(Alignment.BottomEnd)
-            )
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.download),
+                            contentDescription = "Save to Gallery",
+                            tint = if (isEnabled) colorPalette.onOverlay else colorPalette.onOverlay.copy(alpha = 0.5f)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(32.dp.roundedShape)
+                            .clickable(enabled = isEnabled) {
+                                coroutineScope.launch {
+                                    val bitmap = generateLyricsBitmap()
+                                    if (bitmap != null) {
+                                        val uri = saveBitmapToCache(context, bitmap)
+                                        shareImageUri(context, uri)
+                                        isSelectingForShare = false
+                                        selectedTimestamps.clear()
+                                    }
+                                }
+                            }
+                            .background(if (isEnabled) colorPalette.accent else colorPalette.background2)
+                            .padding(horizontal = 24.dp, vertical = 12.dp)
+                    ) {
+                        BasicText(
+                            text = stringResource(R.string.share),
+                            style = typography.s.semiBold.color(
+                                if (isEnabled) colorPalette.text else colorPalette.textDisabled
+                            )
+                        )
+                    }
+                }
+            }
+
+            Buttons()
         }
     }
 }

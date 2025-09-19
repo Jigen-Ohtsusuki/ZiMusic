@@ -52,15 +52,16 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
+import it.vfsfitvnm.core.ui.LocalAppearance
+import it.vfsfitvnm.core.ui.utils.roundedShape
 import it.vfsfitvnm.vimusic.models.ui.UiMedia
 import it.vfsfitvnm.vimusic.preferences.PlayerPreferences
 import it.vfsfitvnm.vimusic.service.PlayerService
 import it.vfsfitvnm.vimusic.utils.formatAsDuration
 import it.vfsfitvnm.vimusic.utils.semiBold
-import it.vfsfitvnm.core.ui.LocalAppearance
-import it.vfsfitvnm.core.ui.utils.roundedShape
 import kotlin.math.PI
 import kotlin.math.sin
+import kotlin.math.roundToLong
 
 // TODO: de-couple from binder
 
@@ -82,6 +83,8 @@ fun SeekBar(
     var scrubbingPosition by remember(media) { mutableStateOf<Long?>(null) }
     val animatedPosition by animateFloatAsState(
         targetValue = scrubbingPosition?.toFloat() ?: position.toFloat(),
+        // This is the magic line that creates the smooth, seamless animation
+        animationSpec = tween(durationMillis = 1000, easing = LinearEasing),
         label = ""
     )
 
@@ -148,8 +151,78 @@ fun SeekBar(
                 isActive = isActive
             )
         }
+
+        PlayerPreferences.SeekBarStyle.Dotted -> {
+            DottedSeekBarBody(
+                position = scrubbingPosition ?: animatedPosition.toLong(),
+                duration = media.duration,
+                isDragging = isDragging,
+                color = color,
+                showDuration = alwaysShowDuration || scrubbingPosition != null,
+                modifier = innerModifier
+            )
+        }
     }
 }
+
+@Composable
+private fun DottedSeekBarBody(
+    position: Long,
+    duration: Long,
+    isDragging: Boolean,
+    color: Color,
+    showDuration: Boolean,
+    modifier: Modifier = Modifier,
+    dotCount: Int = 36
+) {
+    val transition = updateTransition(targetState = isDragging, label = "isDragging")
+    // Animate the bar to be slightly thicker when dragging for better feedback
+    val barHeight by transition.animateDp(label = "barHeight") { if (it) 24.dp else 16.dp }
+
+    Column(modifier = modifier) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(24.dp) // Keep a larger height for easier touch interaction
+        ) {
+            if (duration == 0L) return@Canvas
+
+            val canvasWidth = size.width
+            val canvasHeight = size.height
+            val barHeightPx = barHeight.toPx()
+
+            val dotRadius = 2.5.dp.toPx()
+            val spacing = (canvasWidth - (dotCount * 2 * dotRadius)) / (dotCount - 1)
+            val progress = (position.toFloat() / duration).coerceIn(0f, 1f)
+            val progressWidth = canvasWidth * progress
+
+            // First, draw all the faint dots to form the background track
+            for (i in 0 until dotCount) {
+                val dotCenterX = i * (2 * dotRadius + spacing) + dotRadius
+                drawCircle(
+                    color = color.copy(alpha = 0.3f),
+                    radius = dotRadius,
+                    center = Offset(dotCenterX, canvasHeight / 2)
+                )
+            }
+
+            // Second, draw the solid white progress bar on top of the dots
+            drawRoundRect(
+                color = Color.White,
+                topLeft = Offset(x = 0f, y = (canvasHeight - barHeightPx) / 2),
+                size = Size(width = progressWidth, height = barHeightPx),
+                cornerRadius = CornerRadius(barHeightPx / 2) // Makes the bar have rounded ends
+            )
+        }
+
+        Duration(
+            position = position,
+            duration = duration,
+            show = showDuration
+        )
+    }
+}
+
 
 @Composable
 private fun ClassicSeekBarBody(
@@ -342,7 +415,7 @@ private suspend fun PointerInputScope.detectDrags(
     detectHorizontalDragGestures(
         onDragStart = { offset ->
             setIsDragging(true)
-            onSeekStart((offset.x / size.width * (range.endInclusive - range.start).toFloat() + range.start).toLong())
+            onSeekStart((offset.x / size.width * (range.endInclusive - range.start).toFloat() + range.start).roundToLong())
         },
         onHorizontalDrag = { _, delta ->
             acc += delta / size.width * (range.endInclusive - range.start).toFloat()
@@ -376,7 +449,7 @@ private suspend fun PointerInputScope.detectTaps(
     detectTapGestures(
         onTap = { offset ->
             onSeekStart(
-                (offset.x / size.width * (range.endInclusive - range.start).toFloat() + range.start).toLong()
+                (offset.x / size.width * (range.endInclusive - range.start).toFloat() + range.start).roundToLong()
             )
             onSeekEnd()
         }

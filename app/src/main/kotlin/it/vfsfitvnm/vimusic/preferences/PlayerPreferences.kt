@@ -64,7 +64,8 @@ object PlayerPreferences : GlobalPreferencesHolder() {
 
     enum class SeekBarStyle(val displayName: @Composable () -> String) {
         Static(displayName = { stringResource(R.string.static_seek_bar_name) }),
-        Wavy(displayName = { stringResource(R.string.wavy_seek_bar_name) })
+        Wavy(displayName = { stringResource(R.string.wavy_seek_bar_name) }),
+        Dotted(displayName = { stringResource(R.string.dotted_seek_bar_name) })
     }
 
     enum class WavySeekBarQuality(

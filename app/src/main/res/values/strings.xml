@@ -320,6 +320,7 @@
     <string name="seek_bar_style">Seek bar style</string>
     <string name="static_seek_bar_name">Static</string>
     <string name="wavy_seek_bar_name">Wavy</string>
+    <string name="dotted_seek_bar_name">Dotted</string>
     <string name="seek_bar_quality">Wavy seek bar quality</string>
     <string name="seek_bar_quality_poor">Poor</string>
     <string name="seek_bar_quality_low">Low</string>
@@ -386,6 +387,10 @@
     <string name="unknown_error">An unknown error occurred</string>
     <string name="piped_learn_more_url">https://github.com/TeamPiped/Piped/blob/master/README.md</string>
     <string name="lyrics_cache">Lyrics cache</string>
+    <string name="close">Close</string>
+    <string name="share_lyrics">Share lyrics</string>
+    <string name="lyrics_share_limit_reached">You can select up to 6 lines.</string>
+    <string name="share">Share</string>
     <plurals name="format_reset_blacklist_description">
         <item quantity="one">Remove %1$s song from the blacklist</item>
         <item quantity="other">Remove all %1$s songs from the blacklist</item>

@@ -1,8 +1,11 @@
 package it.vfsfitvnm.vimusic.ui.screens.player
 
+import android.os.Build
 import androidx.annotation.OptIn
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -106,6 +109,11 @@ import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.absoluteValue
 
+private enum class PlayerContentState {
+    Thumbnail, Lyrics
+}
+
+@RequiresApi(Build.VERSION_CODES.P)
 @Composable
 fun Player(
     layoutState: BottomSheetState,
@@ -187,7 +195,7 @@ fun Player(
         state = layoutState,
         modifier = modifier.fillMaxSize(),
         onDismiss = {
-            binder?.let { onDismiss(it) }
+            binder.let { dismissPlayer(it) }
             layoutState.dismissSoft()
         },
         backHandlerEnabled = !menuState.isDisplayed,
@@ -200,7 +208,7 @@ fun Player(
                         if (horizontalSwipeToClose) modifier.onSwipe(
                             animateOffset = true,
                             onSwipeOut = { animationJob ->
-                                binder?.let { onDismiss(it) }
+                                binder.let { dismissPlayer(it) }
                                 animationJob.join()
                                 layoutState.dismissSoft()
                             }
@@ -249,8 +257,8 @@ fun Player(
                 ) {
                     AnimatedContent(
                         targetState = metadata?.title?.toString().orEmpty(),
-                        label = "",
-                        transitionSpec = { fadeIn() togetherWith fadeOut() }
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        label = ""
                     ) { text ->
                         BasicText(
                             text = text,
@@ -262,8 +270,8 @@ fun Player(
                     AnimatedVisibility(visible = metadata?.artist != null) {
                         AnimatedContent(
                             targetState = metadata?.artist?.toString().orEmpty(),
-                            label = "",
-                            transitionSpec = { fadeIn() togetherWith fadeOut() }
+                            transitionSpec = { fadeIn() togetherWith fadeOut() },
+                            label = ""
                         ) { text ->
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -300,7 +308,7 @@ fun Player(
                         IconButton(
                             icon = R.drawable.play_skip_back,
                             color = colorPalette.text,
-                            onClick = { binder?.player?.forceSeekToPrevious() },
+                            onClick = { binder.player.forceSeekToPrevious() },
                             modifier = Modifier
                                 .padding(horizontal = 4.dp, vertical = 8.dp)
                                 .size(20.dp)
@@ -311,10 +319,10 @@ fun Player(
                         modifier = Modifier
                             .clickable(
                                 onClick = {
-                                    if (shouldBePlaying) binder?.player?.pause()
+                                    if (shouldBePlaying) binder.player.pause()
                                     else {
-                                        if (binder?.player?.playbackState == Player.STATE_IDLE) binder.player.prepare()
-                                        binder?.player?.play()
+                                        if (binder.player.playbackState == Player.STATE_IDLE) binder.player.prepare()
+                                        binder.player.play()
                                     }
                                 },
                                 indication = ripple(bounded = false),
@@ -334,7 +342,7 @@ fun Player(
                     IconButton(
                         icon = R.drawable.play_skip_forward,
                         color = colorPalette.text,
-                        onClick = { binder?.player?.forceSeekToNext() },
+                        onClick = { binder.player.forceSeekToNext() },
                         modifier = Modifier
                             .padding(horizontal = 4.dp, vertical = 8.dp)
                             .size(20.dp)
@@ -345,115 +353,180 @@ fun Player(
             }
         }
     ) {
-        var isShowingStatsForNerds by rememberSaveable { mutableStateOf(false) }
-        var isShowingLyricsDialog by rememberSaveable { mutableStateOf(false) }
+        var playerContentState by rememberSaveable { mutableStateOf(PlayerContentState.Thumbnail) }
 
-        if (isShowingLyricsDialog) LyricsDialog(onDismiss = { isShowingLyricsDialog = false })
+        // When the song changes, reset to thumbnail view
+        LaunchedEffect(mediaItem?.mediaId) {
+            playerContentState = PlayerContentState.Thumbnail
+        }
 
         val playerBottomSheetState = rememberBottomSheetState(
             dismissedBound = 64.dp + horizontalBottomPaddingValues.calculateBottomPadding(),
             expandedBound = layoutState.expandedBound
         )
 
-        val containerModifier = Modifier
-            .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    0.5f to colorPalette.background1,
-                    1f to colorPalette.background0
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(shape)
+                .background(
+                    Brush.verticalGradient(
+                        0.5f to colorPalette.background1,
+                        1f to colorPalette.background0
+                    )
                 )
-            )
-            .padding(
-                windowInsets
-                    .only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
-                    .asPaddingValues()
-            )
-            .padding(bottom = playerBottomSheetState.collapsedBound)
+        ) {
+            val containerModifier = Modifier
+                .padding(
+                    windowInsets
+                        .only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+                        .asPaddingValues()
+                )
+                .padding(bottom = playerBottomSheetState.collapsedBound)
 
-        val thumbnailContent: @Composable (modifier: Modifier) -> Unit = { innerModifier ->
-            Pip(
-                numerator = 1,
-                denominator = 1,
-                modifier = innerModifier
-            ) {
-                Thumbnail(
-                    isShowingLyrics = isShowingLyrics,
-                    onShowLyrics = { isShowingLyrics = it },
-                    isShowingStatsForNerds = isShowingStatsForNerds,
-                    onShowStatsForNerds = { isShowingStatsForNerds = it },
-                    onOpenDialog = { isShowingLyricsDialog = true },
+            val controlsContent: @Composable (modifier: Modifier) -> Unit = { innerModifier ->
+                Controls(
+                    media = mediaItem?.toUiMedia(duration),
+                    binder = binder,
                     likedAt = likedAt,
                     setLikedAt = { likedAt = it },
-                    modifier = Modifier
-                        .nestedScroll(layoutState.preUpPostDownNestedScrollConnection)
-                        .pinchToToggle(
-                            key = isShowingLyricsDialog,
-                            direction = PinchDirection.Out,
-                            threshold = 1.05f,
-                            onPinch = {
-                                if (isShowingLyrics) isShowingLyricsDialog = true
-                            }
-                        )
-                        .pinchToToggle(
-                            key = isShowingLyricsDialog,
-                            direction = PinchDirection.In,
-                            threshold = .95f,
-                            onPinch = {
-                                pipHandler.enterPictureInPictureMode()
-                            }
-                        )
+                    shouldBePlaying = shouldBePlaying,
+                    position = position,
+                    modifier = innerModifier
                 )
             }
-        }
 
-        val controlsContent: @Composable (modifier: Modifier) -> Unit = { innerModifier ->
-            Controls(
-                media = mediaItem?.toUiMedia(duration),
-                binder = binder,
-                likedAt = likedAt,
-                setLikedAt = { likedAt = it },
-                shouldBePlaying = shouldBePlaying,
-                position = position,
-                modifier = innerModifier
-            )
-        }
-
-        if (isLandscape) Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = containerModifier.padding(top = 32.dp)
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .weight(0.66f)
-                    .padding(bottom = 16.dp)
+            if (isLandscape) Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = containerModifier.padding(top = 32.dp)
             ) {
-                thumbnailContent(Modifier.padding(horizontal = 16.dp))
-            }
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .weight(0.66f)
+                        .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
+                ) {
+                    val currentMediaItem = mediaItem
+                    val currentLikedAt = likedAt
 
-            controlsContent(
-                Modifier
-                    .padding(vertical = 8.dp)
-                    .fillMaxHeight()
-                    .weight(1f)
-            )
-        } else Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = containerModifier.padding(top = 54.dp)
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.weight(1.25f)
+                    AnimatedContent(
+                        targetState = playerContentState,
+                        transitionSpec = {
+                            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                        },
+                        label = "PlayerContent"
+                    ) { state ->
+                        when (state) {
+                            PlayerContentState.Thumbnail -> {
+                                Pip(
+                                    numerator = 1,
+                                    denominator = 1
+                                ) {
+                                    Thumbnail(
+                                        onTap = { playerContentState = PlayerContentState.Lyrics },
+                                        onDoubleTap = { newLikedAt -> likedAt = newLikedAt },
+                                        likedAt = currentLikedAt,
+                                        modifier = Modifier
+                                            .nestedScroll(layoutState.preUpPostDownNestedScrollConnection)
+                                            .pinchToToggle(
+                                                direction = PinchDirection.In,
+                                                threshold = .95f,
+                                                onPinch = { pipHandler.enterPictureInPictureMode() }
+                                            )
+                                    )
+                                }
+                            }
+                            PlayerContentState.Lyrics -> {
+                                if (currentMediaItem != null) {
+                                    Lyrics(
+                                        mediaId = currentMediaItem.mediaId,
+                                        isDisplayed = true,
+                                        onDismiss = { playerContentState = PlayerContentState.Thumbnail },
+                                        mediaMetadataProvider = { currentMediaItem.mediaMetadata },
+                                        durationProvider = { binder.player.duration },
+                                        ensureSongInserted = { transaction { Database.instance.insert(currentMediaItem) } },
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(thumbnailCornerSize.roundedShape),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                controlsContent(
+                    Modifier
+                        .padding(vertical = 8.dp)
+                        .fillMaxHeight()
+                        .weight(1f)
+                )
+            } else Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = containerModifier.padding(top = 54.dp)
             ) {
-                thumbnailContent(Modifier.padding(horizontal = 32.dp, vertical = 8.dp))
-            }
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .weight(1.25f)
+                        .padding(horizontal = 32.dp, vertical = 8.dp)
+                ) {
+                    val currentMediaItem = mediaItem
+                    val currentLikedAt = likedAt
 
-            controlsContent(
-                Modifier
-                    .padding(vertical = 8.dp)
-                    .fillMaxWidth()
-                    .weight(1f)
-            )
+                    AnimatedContent(
+                        targetState = playerContentState,
+                        transitionSpec = {
+                            fadeIn(animationSpec = tween(200)) togetherWith fadeOut(animationSpec = tween(200))
+                        },
+                        label = "PlayerContent"
+                    ) { state ->
+                        when (state) {
+                            PlayerContentState.Thumbnail -> {
+                                Pip(
+                                    numerator = 1,
+                                    denominator = 1
+                                ) {
+                                    Thumbnail(
+                                        onTap = { playerContentState = PlayerContentState.Lyrics },
+                                        onDoubleTap = { newLikedAt -> likedAt = newLikedAt },
+                                        likedAt = currentLikedAt,
+                                        modifier = Modifier
+                                            .nestedScroll(layoutState.preUpPostDownNestedScrollConnection)
+                                            .pinchToToggle(
+                                                direction = PinchDirection.In,
+                                                threshold = .95f,
+                                                onPinch = { pipHandler.enterPictureInPictureMode() }
+                                            )
+                                    )
+                                }
+                            }
+                            PlayerContentState.Lyrics -> {
+                                if (currentMediaItem != null) {
+                                    Lyrics(
+                                        mediaId = currentMediaItem.mediaId,
+                                        isDisplayed = true,
+                                        onDismiss = { playerContentState = PlayerContentState.Thumbnail },
+                                        mediaMetadataProvider = { currentMediaItem.mediaMetadata },
+                                        durationProvider = { binder.player.duration },
+                                        ensureSongInserted = { transaction { Database.instance.insert(currentMediaItem) } },
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(thumbnailCornerSize.roundedShape),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                controlsContent(
+                    Modifier
+                        .padding(vertical = 8.dp)
+                        .fillMaxWidth()
+                        .weight(1f)
+                )
+            }
         }
 
         var audioDialogOpen by rememberSaveable { mutableStateOf(false) }
@@ -616,7 +689,7 @@ private fun PlayerMenu(
     )
 }
 
-private fun onDismiss(binder: PlayerService.Binder) {
+private fun dismissPlayer(binder: PlayerService.Binder) {
     binder.stopRadio()
     binder.player.clearMediaItems()
 }

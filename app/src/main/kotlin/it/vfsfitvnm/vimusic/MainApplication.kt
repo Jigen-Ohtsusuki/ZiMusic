@@ -212,7 +212,10 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
         SystemBarAppearance(palette = appearance.colorPalette)
 
         BoxWithConstraints(
-            modifier = Modifier.background(appearance.colorPalette.background0) then modifier.fillMaxSize()
+            modifier = Modifier
+                .background(appearance.colorPalette.background0)
+                .then(modifier)
+                .fillMaxSize()
         ) {
             CompositionLocalProvider(
                 LocalAppearance provides appearance,
@@ -286,55 +289,52 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
             )
 
             KeyedCrossfade(state = pip) { currentPip ->
-                if (currentPip) Thumbnail(
-                    isShowingLyrics = true,
-                    onShowLyrics = { },
-                    isShowingStatsForNerds = false,
-                    onShowStatsForNerds = { },
-                    onOpenDialog = { },
-                    likedAt = null,
-                    setLikedAt = { },
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.FillBounds,
-                    shouldShowSynchronizedLyrics = true,
-                    setShouldShowSynchronizedLyrics = { },
-                    showLyricsControls = false
-                ) else CompositionLocalProvider(
-                    LocalPlayerAwareWindowInsets provides playerAwareWindowInsets
-                ) {
-                    val isDownloading by downloadState.collectAsState()
-
-                    Box {
-                        HomeScreen()
-                    }
-
-                    AnimatedVisibility(
-                        visible = isDownloading,
-                        modifier = Modifier.padding(playerAwareWindowInsets.asPaddingValues())
-                    ) {
-                        LinearProgressIndicator(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .align(Alignment.TopCenter)
-                        )
-                    }
-
+                if (currentPip) {
+                    Thumbnail(
+                        onTap = { },
+                        onDoubleTap = { },
+                        likedAt = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.FillBounds
+                    )
+                } else {
                     CompositionLocalProvider(
-                        LocalAppearance provides LocalAppearance.current.let {
-                            if (it.colorPalette.isDark && AppearancePreferences.darkness == Darkness.AMOLED) {
-                                it.copy(colorPalette = it.colorPalette.amoled())
-                            } else it
-                        }
+                        LocalPlayerAwareWindowInsets provides playerAwareWindowInsets
                     ) {
-                        Player(
-                            layoutState = playerBottomSheetState,
+                        val isDownloading by downloadState.collectAsState()
+
+                        Box {
+                            HomeScreen()
+                        }
+
+                        AnimatedVisibility(
+                            visible = isDownloading,
+                            modifier = Modifier.padding(playerAwareWindowInsets.asPaddingValues())
+                        ) {
+                            LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .align(Alignment.TopCenter)
+                            )
+                        }
+
+                        CompositionLocalProvider(
+                            LocalAppearance provides LocalAppearance.current.let {
+                                if (it.colorPalette.isDark && AppearancePreferences.darkness == Darkness.AMOLED) {
+                                    it.copy(colorPalette = it.colorPalette.amoled())
+                                } else it
+                            }
+                        ) {
+                            Player(
+                                layoutState = playerBottomSheetState,
+                                modifier = Modifier.align(Alignment.BottomCenter)
+                            )
+                        }
+
+                        BottomSheetMenu(
                             modifier = Modifier.align(Alignment.BottomCenter)
                         )
                     }
-
-                    BottomSheetMenu(
-                        modifier = Modifier.align(Alignment.BottomCenter)
-                    )
                 }
             }
 

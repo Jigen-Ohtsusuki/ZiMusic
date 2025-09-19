@@ -25,37 +25,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.media3.common.C
-import it.vfsfitvnm.vimusic.Database
 import it.vfsfitvnm.vimusic.LocalPlayerServiceBinder
 import it.vfsfitvnm.vimusic.R
-import it.vfsfitvnm.vimusic.preferences.PlayerPreferences
-import it.vfsfitvnm.vimusic.service.LoginRequiredException
-import it.vfsfitvnm.vimusic.service.PlayableFormatNotFoundException
-import it.vfsfitvnm.vimusic.service.RestrictedVideoException
-import it.vfsfitvnm.vimusic.service.UnplayableException
-import it.vfsfitvnm.vimusic.service.VideoIdMismatchException
-import it.vfsfitvnm.vimusic.service.isLocal
 import it.vfsfitvnm.vimusic.ui.modifiers.onSwipe
 import it.vfsfitvnm.vimusic.utils.forceSeekToNext
 import it.vfsfitvnm.vimusic.utils.forceSeekToPrevious
@@ -66,37 +51,26 @@ import it.vfsfitvnm.core.ui.LocalAppearance
 import it.vfsfitvnm.core.ui.utils.px
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
-import java.net.UnknownHostException
-import java.nio.channels.UnresolvedAddressException
 
 @Composable
 fun Thumbnail(
-    isShowingLyrics: Boolean,
-    onShowLyrics: (Boolean) -> Unit,
-    isShowingStatsForNerds: Boolean,
-    onShowStatsForNerds: (Boolean) -> Unit,
-    onOpenDialog: () -> Unit,
+    onTap: () -> Unit,
+    onDoubleTap: (Long?) -> Unit,
     likedAt: Long?,
-    setLikedAt: (Long?) -> Unit,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.FillWidth,
-    shouldShowSynchronizedLyrics: Boolean = PlayerPreferences.isShowingSynchronizedLyrics,
-    setShouldShowSynchronizedLyrics: (Boolean) -> Unit = {
-        PlayerPreferences.isShowingSynchronizedLyrics = it
-    },
-    showLyricsControls: Boolean = true
 ) {
     val binder = LocalPlayerServiceBinder.current
     val (colorPalette, _, _, thumbnailShape) = LocalAppearance.current
 
-    val (window, error) = windowState()
+    val (window, _) = windowState()
 
     val coroutineScope = rememberCoroutineScope()
     val transitionState = remember { SeekableTransitionState(false) }
     val transition = rememberTransition(transitionState)
-    val opacity by transition.animateFloat(label = "") { if (it) 1f else 0f }
+    val opacity by transition.animateFloat(label = "heartOpacity") { if (it) 1f else 0f }
     val scale by transition.animateFloat(
-        label = "",
+        label = "heartScale",
         transitionSpec = {
             spring(dampingRatio = Spring.DampingRatioLowBouncy)
         }
@@ -140,7 +114,7 @@ fun Thumbnail(
             }
         ),
         contentAlignment = Alignment.Center,
-        label = ""
+        label = "ThumbnailSongChange"
     ) { currentWindow ->
         val shadowElevation by animateDpAsState(
             targetValue = if (window == currentWindow) 8.dp else 0.dp,
@@ -148,12 +122,7 @@ fun Thumbnail(
                 durationMillis = 500,
                 easing = LinearEasing
             ),
-            label = ""
-        )
-        val blurRadius by animateDpAsState(
-            targetValue = if (isShowingLyrics || error != null || isShowingStatsForNerds) 8.dp else 0.dp,
-            animationSpec = tween(500),
-            label = ""
+            label = "shadow"
         )
 
         if (currentWindow != null) Box(
@@ -166,8 +135,6 @@ fun Thumbnail(
                     clip = false
                 )
         ) {
-            var height by remember { mutableIntStateOf(0) }
-
             AsyncImage(
                 model = currentWindow.mediaItem.mediaMetadata.artworkUri
                     ?.thumbnail((Dimensions.thumbnails.player.song - 64.dp).px),
@@ -176,12 +143,13 @@ fun Thumbnail(
                 contentDescription = null,
                 contentScale = contentScale,
                 modifier = Modifier
-                    .pointerInput(Unit) {
+                    .pointerInput(likedAt) {
                         detectTapGestures(
-                            onTap = { onShowLyrics(true) },
-                            onLongPress = { onShowStatsForNerds(true) },
+                            onTap = { onTap() },
                             onDoubleTap = {
-                                if (likedAt == null) setLikedAt(System.currentTimeMillis())
+                                val newLikedAt =
+                                    if (likedAt == null) System.currentTimeMillis() else null
+                                onDoubleTap(newLikedAt)
 
                                 coroutineScope.launch {
                                     val spec = tween<Float>(durationMillis = 500)
@@ -194,34 +162,7 @@ fun Thumbnail(
                     .align(Alignment.Center)
                     .fillMaxWidth()
                     .background(colorPalette.background0)
-                    .let {
-                        if (blurRadius == 0.dp) it else it.blur(radius = blurRadius)
-                    }
                     .animateContentSize()
-                    .onGloballyPositioned { coords ->
-                        coords.size.height.let { if (it > 0) height = it }
-                    }
-            )
-
-            Lyrics(
-                mediaId = currentWindow.mediaItem.mediaId,
-                isDisplayed = isShowingLyrics && error == null,
-                onDismiss = { onShowLyrics(false) },
-                ensureSongInserted = { Database.instance.insert(currentWindow.mediaItem) },
-                mediaMetadataProvider = currentWindow.mediaItem::mediaMetadata,
-                durationProvider = { binder?.player?.duration ?: C.TIME_UNSET },
-                onOpenDialog = onOpenDialog,
-                modifier = Modifier.height(height.px.dp),
-                shouldShowSynchronizedLyrics = shouldShowSynchronizedLyrics,
-                setShouldShowSynchronizedLyrics = setShouldShowSynchronizedLyrics,
-                showControls = showLyricsControls
-            )
-
-            StatsForNerds(
-                mediaId = currentWindow.mediaItem.mediaId,
-                isDisplayed = isShowingStatsForNerds && error == null,
-                onDismiss = { onShowStatsForNerds(false) },
-                modifier = Modifier.height(height.px.dp)
             )
 
             Image(
@@ -238,27 +179,6 @@ fun Thumbnail(
                         alpha = opacity,
                         shadowElevation = 8.dp.px.toFloat()
                     )
-            )
-
-            PlaybackError(
-                isDisplayed = error != null,
-                messageProvider = {
-                    if (currentWindow.mediaItem.isLocal) stringResource(R.string.error_local_music_deleted)
-                    else when (error?.cause?.cause) {
-                        is UnresolvedAddressException, is UnknownHostException ->
-                            stringResource(R.string.error_network)
-
-                        is PlayableFormatNotFoundException -> stringResource(R.string.error_unplayable)
-                        is UnplayableException -> stringResource(R.string.error_source_deleted)
-                        is LoginRequiredException, is RestrictedVideoException ->
-                            stringResource(R.string.error_server_restrictions)
-
-                        is VideoIdMismatchException -> stringResource(R.string.error_id_mismatch)
-                        else -> stringResource(R.string.error_unknown_playback)
-                    }
-                },
-                onDismiss = { binder?.player?.prepare() },
-                modifier = Modifier.height(height.px.dp)
             )
         }
     }

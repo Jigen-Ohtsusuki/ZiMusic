@@ -244,6 +244,9 @@ interface Database {
     @Query("SELECT likedAt FROM Song WHERE id = :songId")
     fun likedAt(songId: String): Flow<Long?>
 
+    @Query("SELECT likedAt FROM Song WHERE id = :songId")
+    fun getLikedAtSync(songId: String): Long?
+
     @Query("UPDATE Song SET likedAt = :likedAt WHERE id = :songId")
     fun like(songId: String, likedAt: Long?): Int
 
@@ -749,6 +752,8 @@ interface Database {
 
     @Transaction
     fun insert(mediaItem: MediaItem, block: (Song) -> Song = { it }) {
+        val existingLikedAt = getLikedAtSync(mediaItem.mediaId)
+
         val extras = mediaItem.mediaMetadata.extras?.songBundle
         val song = Song(
             id = mediaItem.mediaId,
@@ -756,10 +761,11 @@ interface Database {
             artistsText = mediaItem.mediaMetadata.artist?.toString(),
             durationText = extras?.durationText,
             thumbnailUrl = mediaItem.mediaMetadata.artworkUri?.toString(),
-            explicit = extras?.explicit == true
+            explicit = extras?.explicit == true,
+            likedAt = existingLikedAt
         ).let(block)
 
-        upsert(song) // Use the new upsert method
+        upsert(song)
 
         extras?.albumId?.let { albumId ->
             insert(
@@ -806,7 +812,6 @@ interface Database {
     @Upsert
     fun upsert(artist: Artist)
 
-    // FIX: Add the missing upsert methods
     @Upsert
     fun upsert(song: Song)
 
