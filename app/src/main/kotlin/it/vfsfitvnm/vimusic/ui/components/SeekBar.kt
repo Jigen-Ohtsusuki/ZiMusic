@@ -1,12 +1,13 @@
 package it.vfsfitvnm.vimusic.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.expandVertically
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,6 +61,7 @@ import it.vfsfitvnm.vimusic.preferences.PlayerPreferences
 import it.vfsfitvnm.vimusic.service.PlayerService
 import it.vfsfitvnm.vimusic.utils.formatAsDuration
 import it.vfsfitvnm.vimusic.utils.semiBold
+import kotlin.math.abs
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.math.roundToLong
@@ -81,12 +84,25 @@ fun SeekBar(
     range: ClosedRange<Long> = 0L..media.duration
 ) {
     var scrubbingPosition by remember(media) { mutableStateOf<Long?>(null) }
-    val animatedPosition by animateFloatAsState(
-        targetValue = scrubbingPosition?.toFloat() ?: position.toFloat(),
-        // This is the magic line that creates the smooth, seamless animation
-        animationSpec = tween(durationMillis = 1000, easing = LinearEasing),
-        label = ""
-    )
+
+    val animatedPosition = remember { Animatable(position.toFloat()) }
+
+    // This logic now uses a spring for seeks/jumps and a tween for smooth playback
+    LaunchedEffect(position, scrubbingPosition) {
+        val targetValue = scrubbingPosition?.toFloat() ?: position.toFloat()
+
+        if (scrubbingPosition != null || abs(targetValue - animatedPosition.targetValue) > 2000) {
+            // Use a spring for quick, natural animation when seeking or for large jumps
+            animatedPosition.animateTo(targetValue, animationSpec = spring())
+        } else {
+            // Use a linear animation for smooth, continuous playback
+            animatedPosition.animateTo(
+                targetValue = targetValue,
+                animationSpec = tween(durationMillis = 1000, easing = LinearEasing)
+            )
+        }
+    }
+
 
     var isDragging by remember { mutableStateOf(false) }
 
@@ -123,7 +139,7 @@ fun SeekBar(
     when (style) {
         PlayerPreferences.SeekBarStyle.Static -> {
             ClassicSeekBarBody(
-                position = scrubbingPosition ?: animatedPosition.toLong(),
+                position = scrubbingPosition ?: animatedPosition.value.toLong(),
                 duration = media.duration,
                 poiTimestamp = binder.poiTimestamp,
                 isDragging = isDragging,
@@ -138,7 +154,7 @@ fun SeekBar(
 
         PlayerPreferences.SeekBarStyle.Wavy -> {
             WavySeekBarBody(
-                position = scrubbingPosition ?: animatedPosition.toLong(),
+                position = scrubbingPosition ?: animatedPosition.value.toLong(),
                 duration = media.duration,
                 poiTimestamp = binder.poiTimestamp,
                 isDragging = isDragging,
@@ -154,7 +170,7 @@ fun SeekBar(
 
         PlayerPreferences.SeekBarStyle.Dotted -> {
             DottedSeekBarBody(
-                position = scrubbingPosition ?: animatedPosition.toLong(),
+                position = scrubbingPosition ?: animatedPosition.value.toLong(),
                 duration = media.duration,
                 isDragging = isDragging,
                 color = color,
