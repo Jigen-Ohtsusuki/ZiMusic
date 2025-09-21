@@ -33,8 +33,7 @@ data class ColorPalette(
     val isDark: Boolean
 ) : Parcelable
 
-private val defaultAccentColor = Color(0xff3e44ce).hsl
-
+private val defaultAccentColor = Color(0xff00b3a4).hsl
 val defaultLightPalette = ColorPalette(
     background0 = Color(0xfffdfdfe),
     background1 = Color(0xfff8f8fc),
@@ -49,9 +48,9 @@ val defaultLightPalette = ColorPalette(
 )
 
 val defaultDarkPalette = ColorPalette(
-    background0 = Color(0xff16171d),
-    background1 = Color(0xff1f2029),
-    background2 = Color(0xff2b2d3b),
+    background0 = Color(0xff121212),
+    background1 = Color(0xff1E1E1E),
+    background2 = Color(0xff282828),
     text = Color(0xffe1e1e2),
     textSecondary = Color(0xffa3a4a6),
     textDisabled = Color(0xff6f6f73),
@@ -61,45 +60,40 @@ val defaultDarkPalette = ColorPalette(
     isDark = true
 )
 
-private fun lightColorPalette(accent: Hsl) = lightColorPalette(
-    hue = accent.hue,
-    saturation = accent.saturation
-)
-
-private fun lightColorPalette(hue: Float, saturation: Float) = ColorPalette(
+private fun lightColorPalette(source: Hsl) = ColorPalette(
     background0 = Color.hsl(
-        hue = hue,
-        saturation = saturation.coerceAtMost(0.1f),
+        hue = source.hue,
+        saturation = source.saturation.coerceAtMost(0.1f),
         lightness = 0.925f
     ),
     background1 = Color.hsl(
-        hue = hue,
-        saturation = saturation.coerceAtMost(0.3f),
+        hue = source.hue,
+        saturation = source.saturation.coerceAtMost(0.3f),
         lightness = 0.90f
     ),
     background2 = Color.hsl(
-        hue = hue,
-        saturation = saturation.coerceAtMost(0.4f),
+        hue = source.hue,
+        saturation = source.saturation.coerceAtMost(0.4f),
         lightness = 0.85f
     ),
     text = Color.hsl(
-        hue = hue,
-        saturation = saturation.coerceAtMost(0.02f),
+        hue = source.hue,
+        saturation = source.saturation.coerceAtMost(0.02f),
         lightness = 0.12f
     ),
     textSecondary = Color.hsl(
-        hue = hue,
-        saturation = saturation.coerceAtMost(0.1f),
+        hue = source.hue,
+        saturation = source.saturation.coerceAtMost(0.1f),
         lightness = 0.40f
     ),
     textDisabled = Color.hsl(
-        hue = hue,
-        saturation = saturation.coerceAtMost(0.2f),
+        hue = source.hue,
+        saturation = source.saturation.coerceAtMost(0.2f),
         lightness = 0.65f
     ),
     accent = Color.hsl(
-        hue = hue,
-        saturation = saturation.coerceAtMost(0.5f),
+        hue = source.hue,
+        saturation = (source.saturation + 0.1f).coerceIn(0.45f, 0.7f),
         lightness = 0.5f
     ),
     onAccent = Color.White,
@@ -107,50 +101,40 @@ private fun lightColorPalette(hue: Float, saturation: Float) = ColorPalette(
     isDark = false
 )
 
-private fun darkColorPalette(accent: Hsl, darkness: Darkness) = darkColorPalette(
-    hue = accent.hue,
-    saturation = accent.saturation,
-    darkness = darkness
-)
-
-private fun darkColorPalette(
-    hue: Float,
-    saturation: Float,
-    darkness: Darkness
-) = ColorPalette(
+private fun darkColorPalette(source: Hsl, darkness: Darkness) = ColorPalette(
     background0 = if (darkness == Darkness.Normal) Color.hsl(
-        hue = hue,
-        saturation = saturation.coerceAtMost(0.1f),
-        lightness = 0.10f
+        hue = source.hue,
+        saturation = source.saturation.coerceAtMost(0.1f),
+        lightness = 0.08f
     ) else Color.Black,
     background1 = if (darkness == Darkness.Normal) Color.hsl(
-        hue = hue,
-        saturation = saturation.coerceAtMost(0.3f),
-        lightness = 0.15f
+        hue = source.hue,
+        saturation = source.saturation.coerceAtMost(0.3f),
+        lightness = 0.12f
     ) else Color.Black,
     background2 = if (darkness == Darkness.Normal) Color.hsl(
-        hue = hue,
-        saturation = saturation.coerceAtMost(0.4f),
-        lightness = 0.2f
+        hue = source.hue,
+        saturation = source.saturation.coerceAtMost(0.4f),
+        lightness = 0.18f
     ) else Color.Black,
     text = Color.hsl(
-        hue = hue,
-        saturation = saturation.coerceAtMost(0.02f),
+        hue = source.hue,
+        saturation = source.saturation.coerceAtMost(0.02f),
         lightness = 0.88f
     ),
     textSecondary = Color.hsl(
-        hue = hue,
-        saturation = saturation.coerceAtMost(0.1f),
+        hue = source.hue,
+        saturation = source.saturation.coerceAtMost(0.1f),
         lightness = 0.65f
     ),
     textDisabled = Color.hsl(
-        hue = hue,
-        saturation = saturation.coerceAtMost(0.2f),
+        hue = source.hue,
+        saturation = source.saturation.coerceAtMost(0.2f),
         lightness = 0.40f
     ),
     accent = Color.hsl(
-        hue = hue,
-        saturation = saturation.coerceAtMost(if (darkness == Darkness.AMOLED) 0.4f else 0.5f),
+        hue = source.hue,
+        saturation = (source.saturation + 0.05f).coerceIn(0.4f, 0.65f),
         lightness = 0.5f
     ),
     onAccent = Color.White,
@@ -163,43 +147,57 @@ fun accentColorOf(
     isDark: Boolean,
     materialAccentColor: Color?,
     sampleBitmap: Bitmap?
-) = when (source) {
-    ColorSource.Default -> defaultAccentColor
-    ColorSource.Dynamic -> sampleBitmap?.let { dynamicAccentColorOf(it, isDark) }
-        ?: defaultAccentColor
-
-    ColorSource.MaterialYou -> materialAccentColor?.hsl ?: defaultAccentColor
+): Hsl {
+    return when (source) {
+        ColorSource.Default -> defaultAccentColor
+        ColorSource.Dynamic -> sampleBitmap?.let { dynamicAccentColorOf(it) }
+            ?: defaultAccentColor
+        ColorSource.MaterialYou -> materialAccentColor?.hsl ?: defaultAccentColor
+    }
 }
 
-fun dynamicAccentColorOf(
-    bitmap: Bitmap,
-    isDark: Boolean
-): Hsl? {
+fun dynamicAccentColorOf(bitmap: Bitmap): Hsl? {
     val palette = Palette
         .from(bitmap)
-        .maximumColorCount(8)
-        .addFilter(if (isDark) ({ _, hsl -> hsl[0] !in 36f..100f }) else null)
+        .maximumColorCount(16)
         .generate()
 
-    val hsl = if (isDark) {
-        palette.dominantSwatch ?: Palette
-            .from(bitmap)
-            .maximumColorCount(8)
-            .generate()
-            .dominantSwatch
+    val dominantSwatch = palette.dominantSwatch
+    val dominantIsAcceptable = (dominantSwatch?.hsl?.get(1) ?: 0f) > 0.05f
+
+    if (dominantIsAcceptable) {
+        return dominantSwatch?.getHsl()?.hsl
+    }
+
+    val bestSwatch =
+        palette.vibrantSwatch
+            ?: palette.mutedSwatch
+            ?: palette.lightVibrantSwatch
+            ?: dominantSwatch
+
+    return bestSwatch?.getHsl()?.hsl
+}
+
+fun colorPaletteOf(
+    source: ColorSource,
+    darkness: Darkness,
+    isDark: Boolean,
+    materialAccentColor: Color?,
+    sampleBitmap: Bitmap?
+): ColorPalette {
+    val accentColor = accentColorOf(
+        source = source,
+        isDark = isDark,
+        materialAccentColor = materialAccentColor,
+        sampleBitmap = sampleBitmap
+    )
+
+    val palette = if (isDark) {
+        darkColorPalette(accentColor, darkness)
     } else {
-        palette.dominantSwatch
-    }?.hsl ?: return null
-
-    val arr = if (hsl[1] < 0.08)
-        palette.swatches
-            .map(Palette.Swatch::getHsl)
-            .sortedByDescending(FloatArray::component2)
-            .find { it[1] != 0f }
-            ?: hsl
-    else hsl
-
-    return arr.hsl
+        lightColorPalette(accentColor)
+    }
+    return palette.copy(isDefault = accentColor == defaultAccentColor)
 }
 
 fun ColorPalette.amoled() = if (isDark) {
@@ -223,24 +221,6 @@ fun ColorPalette.amoled() = if (isDark) {
         )
     )
 } else this
-
-fun colorPaletteOf(
-    source: ColorSource,
-    darkness: Darkness,
-    isDark: Boolean,
-    materialAccentColor: Color?,
-    sampleBitmap: Bitmap?
-): ColorPalette {
-    val accentColor = accentColorOf(
-        source = source,
-        isDark = isDark,
-        materialAccentColor = materialAccentColor,
-        sampleBitmap = sampleBitmap
-    )
-
-    return (if (isDark) darkColorPalette(accentColor, darkness) else lightColorPalette(accentColor))
-        .copy(isDefault = accentColor == defaultAccentColor)
-}
 
 inline val ColorPalette.isPureBlack get() = background0 == Color.Black
 inline val ColorPalette.collapsedPlayerProgressBar
