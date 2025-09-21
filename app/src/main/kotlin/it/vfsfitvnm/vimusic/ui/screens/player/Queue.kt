@@ -98,7 +98,6 @@ import it.vfsfitvnm.vimusic.utils.shuffleQueue
 import it.vfsfitvnm.vimusic.utils.smoothScrollToTop
 import it.vfsfitvnm.vimusic.utils.windows
 import it.vfsfitvnm.compose.persist.persist
-import it.vfsfitvnm.compose.reordering.animateItemPlacement
 import it.vfsfitvnm.compose.reordering.draggedItem
 import it.vfsfitvnm.compose.reordering.rememberReorderingState
 import it.vfsfitvnm.core.data.enums.PlaylistSortBy
@@ -328,7 +327,6 @@ fun Queue(
                                             }
                                         }
                                     )
-                                    .animateItemPlacement(reorderingState)
                                     .draggedItem(
                                         reorderingState = reorderingState,
                                         index = i
