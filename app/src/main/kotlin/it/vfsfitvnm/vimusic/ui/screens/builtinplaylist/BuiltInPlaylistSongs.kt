@@ -1,48 +1,28 @@
 package it.vfsfitvnm.vimusic.ui.screens.builtinplaylist
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.FractionalThreshold
+import androidx.compose.material.rememberSwipeableState
+import androidx.compose.material.swipeable
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import it.vfsfitvnm.vimusic.Database
-import it.vfsfitvnm.vimusic.LocalPlayerAwareWindowInsets
-import it.vfsfitvnm.vimusic.LocalPlayerServiceBinder
-import it.vfsfitvnm.vimusic.R
-import it.vfsfitvnm.vimusic.models.Song
-import it.vfsfitvnm.vimusic.preferences.DataPreferences
-import it.vfsfitvnm.vimusic.ui.components.LocalMenuState
-import it.vfsfitvnm.vimusic.ui.components.themed.FloatingActionsContainerWithScrollToTop
-import it.vfsfitvnm.vimusic.ui.components.themed.Header
-import it.vfsfitvnm.vimusic.ui.components.themed.InHistoryMediaItemMenu
-import it.vfsfitvnm.vimusic.ui.components.themed.NonQueuedMediaItemMenu
-import it.vfsfitvnm.vimusic.ui.components.themed.SecondaryTextButton
-import it.vfsfitvnm.vimusic.ui.components.themed.ValueSelectorDialog
-import it.vfsfitvnm.vimusic.ui.items.SongItem
-import it.vfsfitvnm.vimusic.ui.screens.home.HeaderSongSortBy
-import it.vfsfitvnm.vimusic.utils.PlaylistDownloadIcon
-import it.vfsfitvnm.vimusic.utils.asMediaItem
-import it.vfsfitvnm.vimusic.utils.enqueue
-import it.vfsfitvnm.vimusic.utils.forcePlayAtIndex
-import it.vfsfitvnm.vimusic.utils.forcePlayFromBeginning
-import it.vfsfitvnm.vimusic.utils.playingSong
 import it.vfsfitvnm.compose.persist.persistList
 import it.vfsfitvnm.core.data.enums.BuiltInPlaylist
 import it.vfsfitvnm.core.data.enums.SongSortBy
@@ -50,15 +30,27 @@ import it.vfsfitvnm.core.data.enums.SortOrder
 import it.vfsfitvnm.core.ui.Dimensions
 import it.vfsfitvnm.core.ui.LocalAppearance
 import it.vfsfitvnm.core.ui.utils.enumSaver
+import it.vfsfitvnm.vimusic.Database
+import it.vfsfitvnm.vimusic.LocalPlayerAwareWindowInsets
+import it.vfsfitvnm.vimusic.LocalPlayerServiceBinder
+import it.vfsfitvnm.vimusic.R
+import it.vfsfitvnm.vimusic.models.Song
+import it.vfsfitvnm.vimusic.preferences.DataPreferences
+import it.vfsfitvnm.vimusic.ui.components.LocalMenuState
+import it.vfsfitvnm.vimusic.ui.components.themed.*
+import it.vfsfitvnm.vimusic.ui.items.SongItem
+import it.vfsfitvnm.vimusic.ui.screens.home.HeaderSongSortBy
+import it.vfsfitvnm.vimusic.utils.*
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.cancellable
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.*
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalCoroutinesApi::class)
+private enum class SwipeState {
+    Covered,
+    Revealed
+}
+
+@OptIn(ExperimentalFoundationApi::class, ExperimentalCoroutinesApi::class, ExperimentalMaterialApi::class)
 @Composable
 fun BuiltInPlaylistSongs(
     builtInPlaylist: BuiltInPlaylist,
@@ -191,40 +183,96 @@ fun BuiltInPlaylistSongs(
                 key = { _, song -> song.id },
                 contentType = { _, song -> song }
             ) { index, song ->
-                SongItem(
-                    modifier = Modifier
-                        .combinedClickable(
-                            onLongClick = {
-                                menuState.display {
-                                    when (builtInPlaylist) {
-                                        BuiltInPlaylist.Offline -> InHistoryMediaItemMenu(
-                                            song = song,
-                                            onDismiss = menuState::hide
-                                        )
+                val swipeableState = rememberSwipeableState(initialValue = SwipeState.Covered)
+                val density = LocalDensity.current
 
-                                        BuiltInPlaylist.Favorites,
-                                        BuiltInPlaylist.Top,
-                                        BuiltInPlaylist.History -> NonQueuedMediaItemMenu(
-                                            mediaItem = song.asMediaItem,
-                                            onDismiss = menuState::hide
-                                        )
-                                    }
-                                }
-                            },
-                            onClick = {
-                                binder?.stopRadio()
-                                binder?.player?.forcePlayAtIndex(
-                                    items = songs.map(Song::asMediaItem),
-                                    index = index
-                                )
-                            }
-                        )
-                        .animateItem(),
-                    song = song,
-                    index = if (builtInPlaylist == BuiltInPlaylist.Top) index else null,
-                    thumbnailSize = Dimensions.thumbnails.song,
-                    isPlaying = playing && currentMediaId == song.id
+                val revealWidth = 96.dp
+                val revealWidthPx = with(density) { revealWidth.toPx() }
+
+                val anchors = mapOf(
+                    0f to SwipeState.Covered,
+                    revealWidthPx to SwipeState.Revealed
                 )
+
+                LaunchedEffect(swipeableState.currentValue) {
+                    if (swipeableState.currentValue == SwipeState.Revealed) {
+                        binder?.player?.addNext(song.asMediaItem)
+                        swipeableState.animateTo(SwipeState.Covered)
+                    }
+                }
+
+                val swipeProgress = (swipeableState.offset.value / revealWidthPx).coerceIn(0f, 1f)
+
+                Box(
+                    modifier = Modifier
+                        .background(colorPalette.background0)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(revealWidth)
+                            .align(Alignment.CenterStart),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.play_skip_forward),
+                            contentDescription = null,
+                            colorFilter = ColorFilter.tint(colorPalette.accent),
+                            modifier = Modifier
+                                .padding(start = 24.dp)
+                                .graphicsLayer {
+                                    alpha = swipeProgress
+                                    scaleX = swipeProgress
+                                    scaleY = swipeProgress
+                                }
+                        )
+                    }
+
+                    SongItem(
+                        modifier = Modifier
+                            .graphicsLayer {
+                                translationX = swipeableState.offset.value
+                            }
+                            .swipeable(
+                                state = swipeableState,
+                                anchors = anchors,
+                                thresholds = { _, _ -> FractionalThreshold(0.5f) },
+                                orientation = Orientation.Horizontal,
+                                resistance = null
+                            )
+                            .combinedClickable(
+                                onLongClick = {
+                                    menuState.display {
+                                        when (builtInPlaylist) {
+                                            BuiltInPlaylist.Offline -> InHistoryMediaItemMenu(
+                                                song = song,
+                                                onDismiss = menuState::hide
+                                            )
+
+                                            BuiltInPlaylist.Favorites,
+                                            BuiltInPlaylist.Top,
+                                            BuiltInPlaylist.History -> NonQueuedMediaItemMenu(
+                                                mediaItem = song.asMediaItem,
+                                                onDismiss = menuState::hide
+                                            )
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    binder?.stopRadio()
+                                    binder?.player?.forcePlayAtIndex(
+                                        items = songs.map(Song::asMediaItem),
+                                        index = index
+                                    )
+                                }
+                            )
+                            .animateItem(),
+                        song = song,
+                        index = if (builtInPlaylist == BuiltInPlaylist.Top) index else null,
+                        thumbnailSize = Dimensions.thumbnails.song,
+                        isPlaying = playing && currentMediaId == song.id
+                    )
+                }
             }
         }
 

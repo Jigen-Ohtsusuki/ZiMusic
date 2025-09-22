@@ -10,20 +10,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -32,15 +21,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.FractionalThreshold
+import androidx.compose.material.rememberSwipeableState
+import androidx.compose.material.swipeable
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -48,8 +34,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
@@ -60,7 +48,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import it.vfsfitvnm.compose.persist.persistList
-import it.vfsfitvnm.compose.reordering.animateItemPlacement
 import it.vfsfitvnm.compose.reordering.draggedItem
 import it.vfsfitvnm.compose.reordering.rememberReorderingState
 import it.vfsfitvnm.core.data.enums.SongSortBy
@@ -72,47 +59,30 @@ import it.vfsfitvnm.core.ui.utils.isLandscape
 import it.vfsfitvnm.providers.innertube.Innertube
 import it.vfsfitvnm.providers.innertube.models.bodies.BrowseBody
 import it.vfsfitvnm.providers.innertube.requests.playlistPage
-import it.vfsfitvnm.vimusic.Database
-import it.vfsfitvnm.vimusic.LocalPlayerAwareWindowInsets
-import it.vfsfitvnm.vimusic.LocalPlayerServiceBinder
-import it.vfsfitvnm.vimusic.R
+import it.vfsfitvnm.vimusic.*
 import it.vfsfitvnm.vimusic.models.Playlist
 import it.vfsfitvnm.vimusic.models.Song
 import it.vfsfitvnm.vimusic.models.SongPlaylistMap
 import it.vfsfitvnm.vimusic.preferences.DataPreferences
-import it.vfsfitvnm.vimusic.query
 import it.vfsfitvnm.vimusic.service.PrecacheService
-import it.vfsfitvnm.vimusic.transaction
 import it.vfsfitvnm.vimusic.ui.components.LocalMenuState
-import it.vfsfitvnm.vimusic.ui.components.themed.ConfirmationDialog
-import it.vfsfitvnm.vimusic.ui.components.themed.Header
-import it.vfsfitvnm.vimusic.ui.components.themed.HeaderIconButton
-import it.vfsfitvnm.vimusic.ui.components.themed.InPlaylistMediaItemMenu
-import it.vfsfitvnm.vimusic.ui.components.themed.LayoutWithAdaptiveThumbnail
-import it.vfsfitvnm.vimusic.ui.components.themed.Menu
-import it.vfsfitvnm.vimusic.ui.components.themed.MenuEntry
-import it.vfsfitvnm.vimusic.ui.components.themed.ReorderHandle
-import it.vfsfitvnm.vimusic.ui.components.themed.TextField
-import it.vfsfitvnm.vimusic.ui.components.themed.TextFieldDialog
+import it.vfsfitvnm.vimusic.ui.components.themed.*
 import it.vfsfitvnm.vimusic.ui.items.SongItem
 import it.vfsfitvnm.vimusic.ui.screens.home.HeaderSongSortBy
-import it.vfsfitvnm.vimusic.utils.asMediaItem
-import it.vfsfitvnm.vimusic.utils.completed
-import it.vfsfitvnm.vimusic.utils.enqueue
-import it.vfsfitvnm.vimusic.utils.forcePlayAtIndex
-import it.vfsfitvnm.vimusic.utils.forcePlayFromBeginning
-import it.vfsfitvnm.vimusic.utils.launchYouTubeMusic
-import it.vfsfitvnm.vimusic.utils.playingSong
-import it.vfsfitvnm.vimusic.utils.secondary
-import it.vfsfitvnm.vimusic.utils.semiBold
-import it.vfsfitvnm.vimusic.utils.toast
+import it.vfsfitvnm.vimusic.utils.*
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
+import it.vfsfitvnm.vimusic.R
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
+private enum class SwipeState {
+    Covered,
+    Revealed
+}
+
+@OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class, ExperimentalMaterialApi::class)
 @Composable
 fun LocalPlaylistSongs(
     playlist: Playlist,
@@ -138,7 +108,6 @@ fun LocalPlaylistSongs(
 
     var filter: String? by rememberSaveable { mutableStateOf(null) }
 
-    // Filter songs based on search query
     val filteredSongs by remember {
         derivedStateOf {
             filter?.lowercase()?.ifBlank { null }?.let { f ->
@@ -149,16 +118,14 @@ fun LocalPlaylistSongs(
         }
     }
 
-    // Add state for sorting
     var sortBy by rememberSaveable(stateSaver = enumSaver()) { mutableStateOf(SongSortBy.Position) }
     var sortOrder by rememberSaveable(stateSaver = enumSaver()) { mutableStateOf(SortOrder.Ascending) }
 
     var loading by remember { mutableStateOf(false) }
 
-    // Fetch songs and apply sorting
     LaunchedEffect(playlist.id, sortBy, sortOrder) {
         Database.instance
-            .playlistSongs(playlist.id, sortBy, sortOrder) // Use the new DAO method
+            .playlistSongs(playlist.id, sortBy, sortOrder)
             .filterNotNull()
             .distinctUntilChanged()
             .collect { songs = it.toImmutableList() }
@@ -291,7 +258,6 @@ fun LocalPlaylistSongs(
 
                             Spacer(modifier = Modifier.weight(1f))
 
-                            // Add the sorting component
                             if (playlist.sortable) {
                                 HeaderSongSortBy(
                                     sortBy = sortBy,
@@ -401,51 +367,101 @@ fun LocalPlaylistSongs(
                     key = { index, song -> "${song.id}-$index" },
                     contentType = { _, song -> song }
                 ) { index, song ->
-                    SongItem(
+                    val swipeableState = rememberSwipeableState(initialValue = SwipeState.Covered)
+                    val density = LocalDensity.current
+
+                    val revealWidth = 96.dp
+                    val revealWidthPx = with(density) { revealWidth.toPx() }
+
+                    val anchors = mapOf(
+                        0f to SwipeState.Covered,
+                        revealWidthPx to SwipeState.Revealed
+                    )
+
+                    LaunchedEffect(swipeableState.currentValue) {
+                        if (swipeableState.currentValue == SwipeState.Revealed) {
+                            binder?.player?.addNext(song.asMediaItem)
+                            swipeableState.animateTo(SwipeState.Covered)
+                        }
+                    }
+
+                    val swipeProgress = (swipeableState.offset.value / revealWidthPx).coerceIn(0f, 1f)
+
+                    Box(
                         modifier = Modifier
-                            .combinedClickable(
-                                onLongClick = {
-                                    menuState.display {
-                                        InPlaylistMediaItemMenu(
-                                            playlistId = playlist.id,
-                                            song = song,
-                                            onDismiss = menuState::hide
+                            .draggedItem(reorderingState = reorderingState, index = index)
+                            .background(colorPalette.background0)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .width(revealWidth)
+                                .align(Alignment.CenterStart),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            Image(
+                                painter = painterResource(R.drawable.play_skip_forward),
+                                contentDescription = null,
+                                colorFilter = ColorFilter.tint(colorPalette.accent),
+                                modifier = Modifier
+                                    .padding(start = 24.dp)
+                                    .graphicsLayer {
+                                        alpha = swipeProgress
+                                        scaleX = swipeProgress
+                                        scaleY = swipeProgress
+                                    }
+                            )
+                        }
+
+                        SongItem(
+                            modifier = Modifier
+                                .graphicsLayer {
+                                    translationX = swipeableState.offset.value
+                                }
+                                .swipeable(
+                                    state = swipeableState,
+                                    anchors = anchors,
+                                    thresholds = { _, _ -> FractionalThreshold(0.5f) },
+                                    orientation = Orientation.Horizontal,
+                                    resistance = null
+                                )
+                                .combinedClickable(
+                                    onLongClick = {
+                                        menuState.display {
+                                            InPlaylistMediaItemMenu(
+                                                playlistId = playlist.id,
+                                                song = song,
+                                                onDismiss = menuState::hide
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        binder?.stopRadio()
+                                        binder?.player?.forcePlayAtIndex(
+                                            items = filteredSongs.map { it.asMediaItem },
+                                            index = index
                                         )
                                     }
-                                },
-                                onClick = {
-                                    binder?.stopRadio()
-                                    binder?.player?.forcePlayAtIndex(
-                                        items = filteredSongs.map { it.asMediaItem },
+                                )
+                                .animateItem(),
+                            song = song,
+                            thumbnailSize = Dimensions.thumbnails.song,
+                            trailingContent = {
+                                if (sortBy == SongSortBy.Position && filter == null) {
+                                    ReorderHandle(
+                                        reorderingState = reorderingState,
                                         index = index
                                     )
                                 }
-                            )
-                            .animateItem() // Add this line for smooth animations
-                            .animateItemPlacement(reorderingState)
-                            .draggedItem(
-                                reorderingState = reorderingState,
-                                index = index
-                            ),
-                        song = song,
-                        thumbnailSize = Dimensions.thumbnails.song,
-                        trailingContent = {
-                            // Only show reorder handle when sorting by position and not searching
-                            if (sortBy == SongSortBy.Position && filter == null) {
-                                ReorderHandle(
-                                    reorderingState = reorderingState,
-                                    index = index
-                                )
-                            }
-                        },
-                        clip = !reorderingState.isDragging,
-                        isPlaying = playing && currentMediaId == song.id
-                    )
+                            },
+                            clip = !reorderingState.isDragging,
+                            isPlaying = playing && currentMediaId == song.id
+                        )
+                    }
                 }
             }
         }
 
-        // Custom floating action buttons using existing square rounded UI style
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -459,7 +475,6 @@ fun LocalPlaylistSongs(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.End
             ) {
-                // Enqueue floating button (top)
                 AnimatedVisibility(
                     visible = !reorderingState.isDragging && filteredSongs.isNotEmpty(),
                     enter = fadeIn() + scaleIn(),
@@ -491,12 +506,10 @@ fun LocalPlaylistSongs(
                     }
                 }
 
-                // Bottom row: Shuffle button and Scroll to top button
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    // Scroll to top button (circular, appears when scrolled, left of shuffle)
                     AnimatedVisibility(
                         visible = remember {
                             derivedStateOf {
@@ -536,7 +549,6 @@ fun LocalPlaylistSongs(
                         }
                     }
 
-                    // Shuffle floating button (main button, always visible)
                     AnimatedVisibility(
                         visible = !reorderingState.isDragging,
                         enter = fadeIn() + scaleIn(),

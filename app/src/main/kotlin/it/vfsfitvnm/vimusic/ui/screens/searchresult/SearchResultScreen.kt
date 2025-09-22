@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
@@ -20,20 +19,12 @@ import androidx.compose.material.swipeable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -54,25 +45,15 @@ import it.vfsfitvnm.vimusic.ui.components.LocalMenuState
 import it.vfsfitvnm.vimusic.ui.components.themed.Header
 import it.vfsfitvnm.vimusic.ui.components.themed.NonQueuedMediaItemMenu
 import it.vfsfitvnm.vimusic.ui.components.themed.Scaffold
-import it.vfsfitvnm.vimusic.ui.items.AlbumItem
-import it.vfsfitvnm.vimusic.ui.items.AlbumItemPlaceholder
-import it.vfsfitvnm.vimusic.ui.items.ArtistItem
-import it.vfsfitvnm.vimusic.ui.items.ArtistItemPlaceholder
-import it.vfsfitvnm.vimusic.ui.items.PlaylistItem
-import it.vfsfitvnm.vimusic.ui.items.PlaylistItemPlaceholder
-import it.vfsfitvnm.vimusic.ui.items.SongItem
-import it.vfsfitvnm.vimusic.ui.items.SongItemPlaceholder
-import it.vfsfitvnm.vimusic.ui.items.VideoItem
-import it.vfsfitvnm.vimusic.ui.items.VideoItemPlaceholder
-import it.vfsfitvnm.vimusic.ui.screens.GlobalRoutes
-import it.vfsfitvnm.vimusic.ui.screens.Route
-import it.vfsfitvnm.vimusic.ui.screens.albumRoute
-import it.vfsfitvnm.vimusic.ui.screens.artistRoute
-import it.vfsfitvnm.vimusic.ui.screens.playlistRoute
+import it.vfsfitvnm.vimusic.ui.items.*
+import it.vfsfitvnm.vimusic.ui.screens.*
 import it.vfsfitvnm.vimusic.utils.addNext
 import it.vfsfitvnm.vimusic.utils.asMediaItem
 import it.vfsfitvnm.vimusic.utils.forcePlay
 import it.vfsfitvnm.vimusic.utils.playingSong
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.foundation.gestures.detectTapGestures
+
 
 private enum class SwipeState {
     Covered,
@@ -144,57 +125,39 @@ fun SearchResultScreen(query: String, onSearchAgain: () -> Unit) {
                             header = headerContent,
                             itemContent = { song ->
                                 val swipeableState = rememberSwipeableState(initialValue = SwipeState.Covered)
-                                val hapticFeedback = LocalHapticFeedback.current
                                 val density = LocalDensity.current
 
-                                val resistanceThreshold = 48.dp
-                                val resistanceThresholdPx = with(density) { resistanceThreshold.toPx() }
-                                val maxStretchFactor = 0.075f
-
+                                // The total width of the swipeable area. This is our cap.
                                 val revealWidth = 96.dp
+                                val revealWidthPx = with(density) { revealWidth.toPx() }
+
+                                // Simplified anchors. The swipe is capped at revealWidthPx.
                                 val anchors = mapOf(
                                     0f to SwipeState.Covered,
-                                    // The total distance includes the resistance zone
-                                    (resistanceThresholdPx + with(density) { revealWidth.toPx() }) to SwipeState.Revealed
+                                    revealWidthPx to SwipeState.Revealed
                                 )
 
-                                var isResistanceBroken by rememberSaveable { mutableStateOf(false) }
-
-                                LaunchedEffect(Unit) {
-                                    snapshotFlow { swipeableState.offset.value }.collect { offset ->
-                                        if (offset >= resistanceThresholdPx && !isResistanceBroken) {
-                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            isResistanceBroken = true
-                                        } else if (offset == 0f) {
-                                            isResistanceBroken = false
-                                        }
-                                    }
-                                }
-
+                                // Effect to handle the action when swipe is completed.
                                 LaunchedEffect(swipeableState.currentValue) {
                                     if (swipeableState.currentValue == SwipeState.Revealed) {
                                         binder?.player?.addNext(song.asMediaItem)
+                                        // Animate back to the original position after the action.
                                         swipeableState.animateTo(SwipeState.Covered)
                                     }
                                 }
 
-                                val rawOffset = swipeableState.offset.value
-                                val (visualOffset, scaleX) = if (rawOffset < resistanceThresholdPx) {
-                                    val stretchProgress = rawOffset / resistanceThresholdPx
-                                    val scale = 1f + (stretchProgress * maxStretchFactor)
-                                    0f to scale
-                                } else {
-                                    val offset = rawOffset - resistanceThresholdPx
-                                    offset to 1f
-                                }
+                                // Calculate progress for the new animation (from 0.0 to 1.0)
+                                val swipeProgress = (swipeableState.offset.value / revealWidthPx).coerceIn(0f, 1f)
 
-                                Box {
-                                    // Background content (Action Icon)
+                                Box(
+                                    modifier = Modifier
+                                        .background(colorPalette.background0) // Set background on the whole Box
+                                ) {
+                                    // Background content (Action Icon) with new animation
                                     Box(
                                         modifier = Modifier
                                             .fillMaxHeight()
                                             .width(revealWidth)
-                                            .background(colorPalette.background0)
                                             .align(Alignment.CenterStart),
                                         contentAlignment = Alignment.CenterStart
                                     ) {
@@ -202,7 +165,14 @@ fun SearchResultScreen(query: String, onSearchAgain: () -> Unit) {
                                             painter = painterResource(R.drawable.play_skip_forward),
                                             contentDescription = null,
                                             colorFilter = ColorFilter.tint(colorPalette.accent),
-                                            modifier = Modifier.padding(start = 24.dp)
+                                            modifier = Modifier
+                                                .padding(start = 24.dp)
+                                                .graphicsLayer {
+                                                    // Icon scales and fades in with the swipe
+                                                    alpha = swipeProgress
+                                                    scaleX = swipeProgress
+                                                    scaleY = swipeProgress
+                                                }
                                         )
                                     }
 
@@ -212,15 +182,16 @@ fun SearchResultScreen(query: String, onSearchAgain: () -> Unit) {
                                         thumbnailSize = Dimensions.thumbnails.song,
                                         modifier = Modifier
                                             .graphicsLayer {
-                                                transformOrigin = TransformOrigin(0f, 0.5f)
-                                                this.scaleX = scaleX
-                                                translationX = visualOffset
+                                                // Simple translation based on the swipe offset
+                                                translationX = swipeableState.offset.value
                                             }
                                             .swipeable(
                                                 state = swipeableState,
                                                 anchors = anchors,
                                                 thresholds = { _, _ -> FractionalThreshold(0.5f) },
-                                                orientation = Orientation.Horizontal
+                                                orientation = Orientation.Horizontal,
+                                                // Disable resistance to cap the swipe
+                                                resistance = null
                                             )
                                             .combinedClickable(
                                                 onLongClick = {
