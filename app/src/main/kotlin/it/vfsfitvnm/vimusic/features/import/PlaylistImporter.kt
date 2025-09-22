@@ -63,7 +63,8 @@ class PlaylistImporter {
         onProgressUpdate: (ImportStatus) -> Unit
     ) {
         try {
-            val totalTracks = songList.size
+            val reversedSongList = songList.reversed()
+            val totalTracks = reversedSongList.size
             val songsToAdd = mutableListOf<Pair<Song, List<Innertube.Info<it.vfsfitvnm.providers.innertube.models.NavigationEndpoint.Endpoint.Browse>>>>()
             val failedTracks = mutableListOf<SongImportInfo>()
             var processedCount = 0
@@ -71,7 +72,8 @@ class PlaylistImporter {
             onProgressUpdate(ImportStatus.InProgress(processed = 0, total = totalTracks))
 
             val batchSize = 10
-            songList.chunked(batchSize).forEach { batch ->
+            // Use the reversed list for processing
+            reversedSongList.chunked(batchSize).forEach { batch ->
                 coroutineScope {
                     val deferredSongsInBatch = batch.map { track ->
                         async(Dispatchers.IO) {
