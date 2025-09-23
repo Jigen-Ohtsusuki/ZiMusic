@@ -9,11 +9,14 @@ import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.*
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -643,29 +646,43 @@ fun Lyrics(
                 synchronized && synchronizedLyrics != null -> {
                     val lazyListState = rememberLazyListState()
 
-                    LaunchedEffect(synchronizedLyrics, density, animatedHeight) {
-                        val currentSynchronizedLyrics = synchronizedLyrics
-                        val centerOffset = with(density) { (-animatedHeight / 3).roundToPx() }
-
+                    LaunchedEffect(synchronizedLyrics.index) {
                         if (!lazyListState.isScrollInProgress) {
-                            lazyListState.animateScrollToItem(
-                                index = currentSynchronizedLyrics.index + 1,
-                                scrollOffset = centerOffset
-                            )
-                        }
+                            val targetIndex = synchronizedLyrics.index + 1
+                            val layoutInfo = lazyListState.layoutInfo
+                            val viewportCenter = layoutInfo.viewportSize.height / 2
 
-                        while (true) {
-                            delay(UPDATE_DELAY)
-                            if (!currentSynchronizedLyrics.update()) continue
+                            val targetItemInfo = layoutInfo.visibleItemsInfo.find { it.index == targetIndex }
 
-                            if (!lazyListState.isScrollInProgress) {
-                                lazyListState.animateScrollToItem(
-                                    index = currentSynchronizedLyrics.index + 1,
-                                    scrollOffset = centerOffset
-                                )
+                            coroutineScope {
+                                if (targetItemInfo != null) {
+                                    val itemCenter = targetItemInfo.offset + targetItemInfo.size / 2
+                                    val scrollAmount = (itemCenter - viewportCenter).toFloat()
+
+                                    lazyListState.animateScrollBy(
+                                        value = scrollAmount,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioLowBouncy,
+                                            stiffness = Spring.StiffnessLow
+                                        )
+                                    )
+                                } else {
+                                    lazyListState.animateScrollToItem(
+                                        index = targetIndex,
+                                        scrollOffset = -viewportCenter
+                                    )
+                                }
                             }
                         }
                     }
+
+                    LaunchedEffect(Unit) {
+                        while(isActive) {
+                            delay(UPDATE_DELAY)
+                            synchronizedLyrics.update()
+                        }
+                    }
+
 
                     val lyricsLines = remember(synchronizedLyrics) {
                         synchronizedLyrics.sentences.entries.toImmutableList()

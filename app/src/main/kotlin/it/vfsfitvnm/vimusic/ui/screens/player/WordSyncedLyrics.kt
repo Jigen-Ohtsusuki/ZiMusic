@@ -6,8 +6,12 @@ import android.os.Build
 import android.text.TextPaint
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -30,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -41,6 +46,9 @@ import it.vfsfitvnm.vimusic.ui.modifiers.verticalFadingEdge
 import it.vfsfitvnm.vimusic.utils.bold
 import it.vfsfitvnm.vimusic.utils.center
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.coroutineScope
+
+private const val STRETCHED_WORD_THRESHOLD_MS = 1270L
 
 @RequiresApi(Build.VERSION_CODES.P)
 @OptIn(ExperimentalLayoutApi::class)
@@ -78,18 +86,36 @@ fun WordSyncedLyrics(
     LaunchedEffect(isVisible, currentLineIndex) {
         if (isVisible && currentLineIndex >= 0 && !lazyListState.isScrollInProgress) {
             val targetIndex = currentLineIndex.coerceAtLeast(0)
-            val viewHeight = lazyListState.layoutInfo.viewportSize.height
-            val centerOffset = viewHeight / 2
+            if (targetIndex >= lyrics.size) return@LaunchedEffect
 
-            if (targetIndex < lyrics.size) {
-                lazyListState.animateScrollToItem(
-                    index = targetIndex + 1,
-                    scrollOffset = -centerOffset
-                )
-                previousLineIndex.intValue = currentLineIndex
+            val layoutInfo = lazyListState.layoutInfo
+            val viewportCenter = layoutInfo.viewportSize.height / 2
+
+            val targetItemInfo = layoutInfo.visibleItemsInfo.find { it.index == targetIndex + 1 }
+
+            coroutineScope {
+                if (targetItemInfo != null) {
+                    val itemCenter = targetItemInfo.offset + targetItemInfo.size / 2
+                    val scrollAmount = (itemCenter - viewportCenter).toFloat()
+
+                    lazyListState.animateScrollBy(
+                        value = scrollAmount,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessLow
+                        )
+                    )
+                } else {
+                    lazyListState.animateScrollToItem(
+                        index = targetIndex + 1,
+                        scrollOffset = -viewportCenter
+                    )
+                }
             }
+            previousLineIndex.intValue = currentLineIndex
         }
     }
+
 
     LazyColumn(
         state = lazyListState,
@@ -109,7 +135,7 @@ fun WordSyncedLyrics(
 
         itemsIndexed(lyrics.toImmutableList()) { lineIndex, line ->
             val endTimeMs = line.startTimeMs + line.durationMs
-            val isActiveLine = currentPosition in line.startTimeMs..endTimeMs
+            val isActiveLine = (currentPosition in line.startTimeMs..endTimeMs) || (lineIndex == currentLineIndex)
 
             FlowRow(
                 modifier = Modifier
@@ -120,7 +146,13 @@ fun WordSyncedLyrics(
                 horizontalArrangement = Arrangement.Center
             ) {
                 line.words.forEach { word ->
-                    val wordStyle: TextStyle = if (isActiveLine) {
+                    val animatedLineColor by animateColorAsState(
+                        targetValue = if (isActiveLine) colorPalette.text else colorPalette.textDisabled,
+                        animationSpec = tween(durationMillis = 300),
+                        label = "lineColorAnimation"
+                    )
+
+                    val textBrush = if (isActiveLine) {
                         val timeProgress = when {
                             currentPosition < word.startTimeMs -> 0f
                             currentPosition >= (word.startTimeMs + word.durationMs) -> 1f
@@ -140,28 +172,49 @@ fun WordSyncedLyrics(
                         val transitionStart = wipeCenter - (wipeFraction / 2)
                         val transitionEnd = wipeCenter + (wipeFraction / 2)
 
-                        val activeColor = colorPalette.text
-                        val upcomingColor = colorPalette.text.copy(alpha = 0.6f)
+                        val activeColor = animatedLineColor
+                        val upcomingColor = animatedLineColor.copy(alpha = 0.6f)
 
-                        val textBrush = Brush.horizontalGradient(
+                        Brush.horizontalGradient(
                             colorStops = arrayOf(
                                 transitionStart.coerceIn(0f, 1f) to activeColor,
                                 transitionEnd.coerceIn(0f, 1f) to upcomingColor
                             )
                         )
-                        baseStyle.merge(TextStyle(brush = textBrush))
                     } else {
-                        val animatedColor by animateColorAsState(
-                            targetValue = colorPalette.textDisabled,
-                            animationSpec = tween(durationMillis = 300),
-                            label = "inactiveLineColor"
-                        )
-                        baseStyle.copy(color = animatedColor)
+                        Brush.horizontalGradient(colors = listOf(animatedLineColor, animatedLineColor))
                     }
+
+                    val isStretchedWord = word.durationMs > STRETCHED_WORD_THRESHOLD_MS
+                    val isWordCurrentlyBeingSung = currentPosition in word.startTimeMs..(word.startTimeMs + word.durationMs)
+
+                    val glowIntensity = if (isStretchedWord && isWordCurrentlyBeingSung) {
+                        val wordProgress = if (word.durationMs > 0) {
+                            ((currentPosition - word.startTimeMs) / word.durationMs.toFloat()).coerceIn(0f, 1f)
+                        } else 0f
+
+                        val fadeInOut = 1f - kotlin.math.abs(wordProgress - 0.5f) * 2f
+                        fadeInOut.coerceIn(0f, 1f)
+                    } else 0f
+
+                    val animatedGlowRadius by animateFloatAsState(
+                        targetValue = glowIntensity * 16f,
+                        animationSpec = tween(durationMillis = 300),
+                        label = "glowRadiusAnimation"
+                    )
+
+                    val wordStyle = baseStyle.merge(TextStyle(brush = textBrush))
 
                     BasicText(
                         text = word.text,
-                        style = wordStyle
+                        style = wordStyle.copy(
+                            shadow = if (animatedGlowRadius > 0f) {
+                                Shadow(
+                                    color = animatedLineColor.copy(alpha = 0.325f),
+                                    blurRadius = animatedGlowRadius
+                                )
+                            } else null
+                        )
                     )
                 }
             }
