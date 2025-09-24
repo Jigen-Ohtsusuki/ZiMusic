@@ -30,6 +30,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope // <- ADD THIS IMPORT
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,8 +48,11 @@ import it.vfsfitvnm.vimusic.utils.bold
 import it.vfsfitvnm.vimusic.utils.center
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay // <- ADD THIS IMPORT
+import kotlinx.coroutines.launch // <- ADD THIS IMPORT
 
 private const val STRETCHED_WORD_THRESHOLD_MS = 1270L
+private const val SEEK_SYNC_DELAY_MS = 100L
 
 @RequiresApi(Build.VERSION_CODES.P)
 @OptIn(ExperimentalLayoutApi::class)
@@ -62,6 +66,7 @@ fun WordSyncedLyrics(
     val (colorPalette, typography) = LocalAppearance.current
     val baseStyle = typography.l.center.bold
     val density = LocalDensity.current
+    val coroutineScope = rememberCoroutineScope()
 
     val textPaint = remember {
         TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -142,7 +147,13 @@ fun WordSyncedLyrics(
                     .fillMaxWidth()
                     .padding(vertical = 4.dp, horizontal = 32.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .clickable { binder?.player?.seekTo(line.startTimeMs) },
+                    .clickable {
+                        binder?.player?.seekTo(line.startTimeMs)
+                        coroutineScope.launch {
+                            delay(SEEK_SYNC_DELAY_MS)
+                            manager.forceSync()
+                        }
+                    },
                 horizontalArrangement = Arrangement.Center
             ) {
                 line.words.forEach { word ->
