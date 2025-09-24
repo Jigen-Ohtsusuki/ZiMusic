@@ -210,7 +210,7 @@ fun WordSyncedLyrics(
                         style = wordStyle.copy(
                             shadow = if (animatedGlowRadius > 0f) {
                                 Shadow(
-                                    color = animatedLineColor.copy(alpha = 0.325f),
+                                    color = animatedLineColor.copy(alpha = 0.425f),
                                     blurRadius = animatedGlowRadius
                                 )
                             } else null
