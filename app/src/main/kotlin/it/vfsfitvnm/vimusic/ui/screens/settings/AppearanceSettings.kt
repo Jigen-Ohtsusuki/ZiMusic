@@ -194,13 +194,6 @@ fun AppearanceSettings() = with(AppearancePreferences) {
             )
 
             SwitchSettingsEntry(
-                title = stringResource(R.string.pip),
-                text = stringResource(R.string.pip_description),
-                isChecked = autoPip,
-                onCheckedChange = { autoPip = it }
-            )
-
-            SwitchSettingsEntry(
                 title = stringResource(R.string.auto_open_player),
                 text = stringResource(R.string.auto_open_player_description),
                 isChecked = openPlayer,

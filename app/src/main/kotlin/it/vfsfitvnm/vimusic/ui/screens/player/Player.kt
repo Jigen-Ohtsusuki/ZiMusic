@@ -79,16 +79,12 @@ import it.vfsfitvnm.vimusic.ui.components.themed.IconButton
 import it.vfsfitvnm.vimusic.ui.components.themed.SecondaryTextButton
 import it.vfsfitvnm.vimusic.ui.components.themed.SliderDialog
 import it.vfsfitvnm.vimusic.ui.components.themed.SliderDialogBody
-import it.vfsfitvnm.vimusic.ui.modifiers.PinchDirection
 import it.vfsfitvnm.vimusic.ui.modifiers.onSwipe
-import it.vfsfitvnm.vimusic.ui.modifiers.pinchToToggle
 import it.vfsfitvnm.vimusic.utils.DisposableListener
-import it.vfsfitvnm.vimusic.utils.Pip
 import it.vfsfitvnm.vimusic.utils.forceSeekToNext
 import it.vfsfitvnm.vimusic.utils.forceSeekToPrevious
 import it.vfsfitvnm.vimusic.utils.positionAndDurationState
 import it.vfsfitvnm.vimusic.utils.rememberEqualizerLauncher
-import it.vfsfitvnm.vimusic.utils.rememberPipHandler
 import it.vfsfitvnm.vimusic.utils.seamlessPlay
 import it.vfsfitvnm.vimusic.utils.secondary
 import it.vfsfitvnm.vimusic.utils.semiBold
@@ -127,8 +123,6 @@ fun Player(
     val menuState = LocalMenuState.current
     val (colorPalette, typography, thumbnailCornerSize) = LocalAppearance.current
     val binder = LocalPlayerServiceBinder.current
-
-    val pipHandler = rememberPipHandler()
 
     PersistMapCleanup(prefix = "queue/suggestions")
 
@@ -418,23 +412,13 @@ fun Player(
                     ) { state ->
                         when (state) {
                             PlayerContentState.Thumbnail -> {
-                                Pip(
-                                    numerator = 1,
-                                    denominator = 1
-                                ) {
-                                    Thumbnail(
-                                        onTap = { playerContentState = PlayerContentState.Lyrics },
-                                        onDoubleTap = { newLikedAt -> likedAt = newLikedAt },
-                                        likedAt = currentLikedAt,
-                                        modifier = Modifier
-                                            .nestedScroll(layoutState.preUpPostDownNestedScrollConnection)
-                                            .pinchToToggle(
-                                                direction = PinchDirection.In,
-                                                threshold = .95f,
-                                                onPinch = { pipHandler.enterPictureInPictureMode() }
-                                            )
-                                    )
-                                }
+                                Thumbnail(
+                                    onTap = { playerContentState = PlayerContentState.Lyrics },
+                                    onDoubleTap = { newLikedAt -> likedAt = newLikedAt },
+                                    likedAt = currentLikedAt,
+                                    modifier = Modifier
+                                        .nestedScroll(layoutState.preUpPostDownNestedScrollConnection)
+                                )
                             }
                             PlayerContentState.Lyrics -> {
                                 if (currentMediaItem != null) {
@@ -483,23 +467,13 @@ fun Player(
                     ) { state ->
                         when (state) {
                             PlayerContentState.Thumbnail -> {
-                                Pip(
-                                    numerator = 1,
-                                    denominator = 1
-                                ) {
-                                    Thumbnail(
-                                        onTap = { playerContentState = PlayerContentState.Lyrics },
-                                        onDoubleTap = { newLikedAt -> likedAt = newLikedAt },
-                                        likedAt = currentLikedAt,
-                                        modifier = Modifier
-                                            .nestedScroll(layoutState.preUpPostDownNestedScrollConnection)
-                                            .pinchToToggle(
-                                                direction = PinchDirection.In,
-                                                threshold = .95f,
-                                                onPinch = { pipHandler.enterPictureInPictureMode() }
-                                            )
-                                    )
-                                }
+                                Thumbnail(
+                                    onTap = { playerContentState = PlayerContentState.Lyrics },
+                                    onDoubleTap = { newLikedAt -> likedAt = newLikedAt },
+                                    likedAt = currentLikedAt,
+                                    modifier = Modifier
+                                        .nestedScroll(layoutState.preUpPostDownNestedScrollConnection)
+                                )
                             }
                             PlayerContentState.Lyrics -> {
                                 if (currentMediaItem != null) {

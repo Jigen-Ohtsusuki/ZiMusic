@@ -30,7 +30,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope // <- ADD THIS IMPORT
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,8 +48,8 @@ import it.vfsfitvnm.vimusic.utils.bold
 import it.vfsfitvnm.vimusic.utils.center
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay // <- ADD THIS IMPORT
-import kotlinx.coroutines.launch // <- ADD THIS IMPORT
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private const val STRETCHED_WORD_THRESHOLD_MS = 1270L
 private const val SEEK_SYNC_DELAY_MS = 100L

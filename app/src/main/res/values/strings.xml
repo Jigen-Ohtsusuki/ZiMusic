@@ -204,8 +204,6 @@
     <string name="lyrics_keep_screen_awake_description">Keeps the screen awake while the lyrics are showing</string>
     <string name="lyrics_show_system_bars">Show system bars (lyrics)</string>
     <string name="lyrics_show_system_bars_description">Turning this off enables system-wide full-screen</string>
-    <string name="pip">PIP</string>
-    <string name="pip_description">Automatically switches to Picture-In-Picure mode when switching to the background</string>
     <string name="auto_open_player">Open player</string>
     <string name="auto_open_player_description">Automatically expand player when tapping on a song</string>
     <string name="cache">Cache</string>
@@ -387,7 +385,6 @@
     <string name="unknown_error">An unknown error occurred</string>
     <string name="piped_learn_more_url">https://github.com/TeamPiped/Piped/blob/master/README.md</string>
     <string name="lyrics_cache">Lyrics cache</string>
-    <string name="close">Close</string>
     <string name="share_lyrics">Share lyrics</string>
     <string name="lyrics_share_limit_reached">You can select up to 6 lines.</string>
     <string name="share">Share</string>

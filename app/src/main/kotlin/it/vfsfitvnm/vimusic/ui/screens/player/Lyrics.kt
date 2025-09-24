@@ -169,8 +169,6 @@ fun Lyrics(
     var isSelectingForShare by remember(mediaId) { mutableStateOf(false) }
     val selectedTimestamps = remember(mediaId) { mutableStateListOf<Long>() }
 
-    val pip = isInPip()
-
     var lyrics by remember { mutableStateOf<Lyrics?>(null) }
 
     val showSynchronizedLyrics = remember(shouldShowSynchronizedLyrics, lyrics) {
@@ -565,7 +563,7 @@ fun Lyrics(
                     .background(Color.Black.copy(0.4f))
                     .padding(all = 8.dp)
                     .fillMaxWidth(),
-                maxLines = if (pip) 1 else Int.MAX_VALUE,
+                maxLines = Int.MAX_VALUE,
                 overflow = TextOverflow.Ellipsis
             )
         }
@@ -583,7 +581,7 @@ fun Lyrics(
                     .background(Color.Black.copy(0.4f))
                     .padding(all = 8.dp)
                     .fillMaxWidth(),
-                maxLines = if (pip) 1 else Int.MAX_VALUE,
+                maxLines = Int.MAX_VALUE,
                 overflow = TextOverflow.Ellipsis
             )
         }
@@ -979,7 +977,7 @@ fun Lyrics(
 
                 Image(
                     painter = painterResource(R.drawable.close),
-                    contentDescription = stringResource(R.string.close),
+                    contentDescription = null,
                     colorFilter = ColorFilter.tint(if (colorPalette.isDark) colorPalette.onOverlay else Color.Black),
                     modifier = Modifier
                         .clickable(

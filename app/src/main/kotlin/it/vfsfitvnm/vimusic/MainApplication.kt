@@ -53,7 +53,6 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
@@ -79,23 +78,17 @@ import it.vfsfitvnm.vimusic.ui.screens.albumRoute
 import it.vfsfitvnm.vimusic.ui.screens.artistRoute
 import it.vfsfitvnm.vimusic.ui.screens.home.HomeScreen
 import it.vfsfitvnm.vimusic.ui.screens.player.Player
-import it.vfsfitvnm.vimusic.ui.screens.player.Thumbnail
 import it.vfsfitvnm.vimusic.ui.screens.playlistRoute
 import it.vfsfitvnm.vimusic.ui.screens.searchResultRoute
 import it.vfsfitvnm.vimusic.ui.screens.settingsRoute
 import it.vfsfitvnm.vimusic.utils.DisposableListener
-import it.vfsfitvnm.vimusic.utils.KeyedCrossfade
 import it.vfsfitvnm.vimusic.utils.LocalMonetCompat
 import it.vfsfitvnm.vimusic.utils.asMediaItem
 import it.vfsfitvnm.vimusic.utils.collectProvidedBitmapAsState
 import it.vfsfitvnm.vimusic.utils.forcePlay
 import it.vfsfitvnm.vimusic.utils.intent
 import it.vfsfitvnm.vimusic.utils.invokeOnReady
-import it.vfsfitvnm.vimusic.utils.isInPip
-import it.vfsfitvnm.vimusic.utils.maybeEnterPip
-import it.vfsfitvnm.vimusic.utils.maybeExitPip
 import it.vfsfitvnm.vimusic.utils.setDefaultPalette
-import it.vfsfitvnm.vimusic.utils.shouldBePlaying
 import it.vfsfitvnm.vimusic.utils.toast
 import it.vfsfitvnm.compose.persist.LocalPersistMap
 import it.vfsfitvnm.compose.persist.PersistMap
@@ -285,61 +278,42 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
                     .add(WindowInsets(bottom = bottom))
             }
 
-            val pip = isInPip(
-                onChange = {
-                    if (!it || vm.binder?.player?.shouldBePlaying != true) return@isInPip
-                    playerBottomSheetState.expandSoft()
-                }
-            )
+            CompositionLocalProvider(
+                LocalPlayerAwareWindowInsets provides playerAwareWindowInsets
+            ) {
+                val isDownloading by downloadState.collectAsState()
 
-            KeyedCrossfade(state = pip) { currentPip ->
-                if (currentPip) {
-                    Thumbnail(
-                        onTap = { },
-                        onDoubleTap = { },
-                        likedAt = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.FillBounds
+                Box {
+                    HomeScreen()
+                }
+
+                AnimatedVisibility(
+                    visible = isDownloading,
+                    modifier = Modifier.padding(playerAwareWindowInsets.asPaddingValues())
+                ) {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopCenter)
                     )
-                } else {
-                    CompositionLocalProvider(
-                        LocalPlayerAwareWindowInsets provides playerAwareWindowInsets
-                    ) {
-                        val isDownloading by downloadState.collectAsState()
-
-                        Box {
-                            HomeScreen()
-                        }
-
-                        AnimatedVisibility(
-                            visible = isDownloading,
-                            modifier = Modifier.padding(playerAwareWindowInsets.asPaddingValues())
-                        ) {
-                            LinearProgressIndicator(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .align(Alignment.TopCenter)
-                            )
-                        }
-
-                        CompositionLocalProvider(
-                            LocalAppearance provides LocalAppearance.current.let {
-                                if (it.colorPalette.isDark && AppearancePreferences.darkness == Darkness.AMOLED) {
-                                    it.copy(colorPalette = it.colorPalette.amoled())
-                                } else it
-                            }
-                        ) {
-                            Player(
-                                layoutState = playerBottomSheetState,
-                                modifier = Modifier.align(Alignment.BottomCenter)
-                            )
-                        }
-
-                        BottomSheetMenu(
-                            modifier = Modifier.align(Alignment.BottomCenter)
-                        )
-                    }
                 }
+
+                CompositionLocalProvider(
+                    LocalAppearance provides LocalAppearance.current.let {
+                        if (it.colorPalette.isDark && AppearancePreferences.darkness == Darkness.AMOLED) {
+                            it.copy(colorPalette = it.colorPalette.amoled())
+                        } else it
+                    }
+                ) {
+                    Player(
+                        layoutState = playerBottomSheetState,
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                    )
+                }
+
+                BottomSheetMenu(
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
             }
 
             vm.binder?.player.DisposableListener {
@@ -349,7 +323,6 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
                         reason: Int
                     ) = when {
                         mediaItem == null -> {
-                            maybeExitPip()
                             playerBottomSheetState.dismissSoft()
                         }
 
@@ -436,12 +409,6 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
         isInitialChange: Boolean
     ) {
         if (!isInitialChange) recreate()
-    }
-
-    override fun onUserLeaveHint() {
-        super.onUserLeaveHint()
-
-        if (AppearancePreferences.autoPip && vm.binder?.player?.shouldBePlaying == true) maybeEnterPip()
     }
 }
 

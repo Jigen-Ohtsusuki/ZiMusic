@@ -25,7 +25,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import it.vfsfitvnm.vimusic.utils.center
 import it.vfsfitvnm.vimusic.utils.color
-import it.vfsfitvnm.vimusic.utils.isInPip
 import it.vfsfitvnm.vimusic.utils.medium
 import it.vfsfitvnm.core.ui.LocalAppearance
 import it.vfsfitvnm.core.ui.onOverlay
@@ -40,7 +39,6 @@ fun PlaybackError(
 ) = Box(modifier = modifier) {
     val (colorPalette, typography) = LocalAppearance.current
     val message by rememberUpdatedState(newValue = messageProvider())
-    val pip = isInPip()
 
     AnimatedVisibility(
         visible = isDisplayed,
@@ -76,7 +74,7 @@ fun PlaybackError(
                 .background(colorPalette.overlay.copy(alpha = 0.4f))
                 .padding(all = 8.dp)
                 .fillMaxWidth(),
-            maxLines = if (pip) 1 else Int.MAX_VALUE,
+            maxLines = Int.MAX_VALUE,
             overflow = TextOverflow.Ellipsis
         )
     }
