@@ -1,6 +1,6 @@
 package com.google.android.material.color
 
-import it.vfsfitvnm.core.ui.utils.isAtLeastAndroid12
+import dev.jigen.core.ui.utils.isAtLeastAndroid12
 
 @Suppress("unused")
 object DynamicColors {

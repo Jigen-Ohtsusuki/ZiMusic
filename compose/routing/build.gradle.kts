@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "it.vfsfitvnm.compose.routing"
+    namespace = "dev.jigen.compose.routing"
     compileSdk = 36
 
     defaultConfig {

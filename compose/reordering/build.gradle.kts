@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "it.vfsfitvnm.compose.reordering"
+    namespace = "dev.jigen.compose.reordering"
     compileSdk = 36
 
     defaultConfig {

@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        ## ⚠️ Make sure you are able to reproduce the bug with the [latest version](https://github.com/vfsfitvnm/vimusic/releases/latest).
+        ## ⚠️ Make sure you are able to reproduce the bug with the [latest version](https://github.com/jigen-ohtsusuki/zimusic/releases/latest).
         ## ⚠️ Make sure there is no issue about this bug already.
 
   - type: textarea
@@ -57,13 +57,13 @@ body:
       label: Logs
       description: |
         If your bug includes a crash, please use `adb logcat` or other ways to provide logs.
-  
+
   - type: input
-    id: vimusic-version
+    id: zimusic-version
     attributes:
-      label: ViMusic version
+      label: ZiMusic version
       placeholder: |
-        Example: "0.5.4"
+        Example: "0.1.0"
     validations:
       required: true
 

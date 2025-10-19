@@ -57,7 +57,7 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-DEBUG"
-            manifestPlaceholders["appName"] = "ViMusic Debug"
+            manifestPlaceholders["appName"] = "ZiMusic Debug"
             buildConfigField("String", "LYRICS_API_BASE", "\"${localProperties["LYRICS_API_BASE"]}\"")
         }
 
@@ -65,7 +65,7 @@ android {
             versionNameSuffix = "-RELEASE"
             isMinifyEnabled = true
             isShrinkResources = true
-            manifestPlaceholders["appName"] = "ViMusic"
+            manifestPlaceholders["appName"] = "ZiMusic"
             buildConfigField("String", "LYRICS_API_BASE", "\"${localProperties["LYRICS_API_BASE"]}\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -79,7 +79,7 @@ android {
 
             applicationIdSuffix = ".nightly"
             versionNameSuffix = "-NIGHTLY"
-            manifestPlaceholders["appName"] = "ViMusic Nightly"
+            manifestPlaceholders["appName"] = "ZiMusic Nightly"
             signingConfig = signingConfigs.findByName("ci")
         }
     }

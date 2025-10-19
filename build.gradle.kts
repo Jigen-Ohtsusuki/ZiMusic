@@ -14,7 +14,7 @@ plugins {
 }
 
 allprojects {
-    group = "it.vfsfitvnm.vimusic"
+    group = "dev.jigen.zimusic"
     version = "0.1.3"
 
     apply(plugin = "io.gitlab.arturbosch.detekt")

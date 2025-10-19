@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "it.vfsfitvnm.core.ui"
+    namespace = "dev.jigen.core.ui"
     compileSdk = 36
 
     defaultConfig {

@@ -43,7 +43,7 @@
     </queries>
 
     <application
-        android:name="it.vfsfitvnm.vimusic.MainApplication"
+        android:name="dev.jigen.zimusic.MainApplication"
         android:allowBackup="true"
         android:banner="@mipmap/ic_banner"
         android:configChanges="colorMode|density|fontScale|keyboard|keyboardHidden|layoutDirection|locale|mcc|mnc|navigation|orientation|screenLayout|screenSize|smallestScreenSize|touchscreen|uiMode"
@@ -53,15 +53,15 @@
         android:label="${appName}"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="false"
-        android:theme="@style/Theme.ViMusic.NoActionBar"
+        android:theme="@style/Theme.ZiMusic.NoActionBar"
         android:appCategory="audio"
         tools:ignore="UnusedAttribute">
 
         <activity
-            android:name="it.vfsfitvnm.vimusic.MainActivity"
+            android:name="dev.jigen.zimusic.MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:theme="@style/Theme.ViMusic.NoActionBar"
+            android:theme="@style/Theme.ZiMusic.NoActionBar"
             android:windowSoftInputMode="adjustResize"
             android:supportsPictureInPicture="true"
             android:configChanges="colorMode|density|fontScale|keyboard|keyboardHidden|layoutDirection|locale|mcc|mnc|navigation|orientation|screenLayout|screenSize|smallestScreenSize|touchscreen|uiMode">
@@ -172,7 +172,7 @@
         </activity>
 
         <service
-            android:name="it.vfsfitvnm.vimusic.service.PlayerService"
+            android:name="dev.jigen.zimusic.service.PlayerService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback">
 
@@ -196,7 +196,7 @@
         </receiver>
 
         <service
-            android:name="it.vfsfitvnm.vimusic.service.PlayerMediaBrowserService"
+            android:name="dev.jigen.zimusic.service.PlayerMediaBrowserService"
             android:enabled="false"
             android:exported="true"
             tools:ignore="ExportedService">
@@ -212,7 +212,7 @@
         </service>
 
         <receiver
-            android:name="it.vfsfitvnm.vimusic.service.PlayerService$NotificationDismissReceiver"
+            android:name="dev.jigen.zimusic.service.PlayerService$NotificationDismissReceiver"
             android:exported="false" />
 
         <meta-data
@@ -250,7 +250,7 @@
         </provider>
 
         <service
-            android:name="it.vfsfitvnm.vimusic.service.PrecacheService"
+            android:name="dev.jigen.zimusic.service.PrecacheService"
             android:exported="false"
             android:foregroundServiceType="dataSync">
 

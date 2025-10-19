@@ -20,7 +20,7 @@ Compose:
   ModifierMissing:
     active: true
     ignoreAnnotated:
-      - it.vfsfitvnm.vimusic.ui.screens.Route
+      - dev.jigen.zimusic.ui.screens.Route
   ModifierNaming:
     active: true
   ModifierNotUsedAtRoot:

@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "it.vfsfitvnm.compose.persist"
+    namespace = "dev.jigen.compose.persist"
     compileSdk = 36
 
     defaultConfig {

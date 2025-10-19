@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "it.vfsfitvnm.compose.preferences"
+    namespace = "dev.jigen.compose.preferences"
     compileSdk = 36
 
     defaultConfig {

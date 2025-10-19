@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "it.vfsfitvnm.core.data"
+    namespace = "dev.jigen.core.data"
     compileSdk = 36
 
     defaultConfig {

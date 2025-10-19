@@ -1,6 +1,6 @@
 <div align="center">
     <img src="./app/src/main/ic_launcher-playstore.png" width="128" height="128" style="display: block; margin: 0 auto"/>
-    <h1>ViMusic</h1>
+    <h1>ZiMusic</h1>
     <p>An Android application for seamless music streaming</p>
 </div>
 
@@ -22,7 +22,7 @@
 * 💾 **Intelligent Lyrics Caching:** Word-level lyrics are cached locally to save data and reduce loading times.
 * 🚀 **Enhanced Reliability:** Uses the battle-tested **NewPipeExtractor** engine for fetching music streams.
 
-#### Inherited from Original ViMusic
+#### Inherited from Original ZiMusic
 * 🎶 **Play from YouTube Music:** Play (almost) any song or video from YouTube Music.
 * 📁 **Local Device Files:** Play music stored on your device.
 * 🌙 **Background Play:** Keep your music playing when the app is in the background.
@@ -41,7 +41,7 @@
 [<img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png"
 alt="Get it on GitHub"
 height="80"
-align="center">](https://github.com/Jigen-Ohtsusuki/ViMusic/releases/latest)
+align="center">](https://github.com/Jigen-Ohtsusuki/ZiMusic/releases/latest)
 
 ## Acknowledgments
 
