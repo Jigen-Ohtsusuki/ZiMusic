@@ -1,24 +1,16 @@
 package dev.jigen.zimusic
 
-import android.content.ContentValues
 import android.database.SQLException
-import android.database.sqlite.SQLiteDatabase.CONFLICT_IGNORE
 import android.os.Parcel
 import androidx.annotation.OptIn
-import androidx.core.database.getFloatOrNull
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
-import androidx.room.AutoMigration
 import androidx.room.Dao
 import androidx.room.Delete
-import androidx.room.DeleteColumn
-import androidx.room.DeleteTable
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.RawQuery
-import androidx.room.RenameColumn
-import androidx.room.RenameTable
 import androidx.room.RewriteQueriesToDropUnusedColumns
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -27,10 +19,7 @@ import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import androidx.room.Update
 import androidx.room.Upsert
-import androidx.room.migration.AutoMigrationSpec
-import androidx.room.migration.Migration
 import androidx.sqlite.db.SimpleSQLiteQuery
-import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteQuery
 import dev.jigen.zimusic.models.Album
 import dev.jigen.zimusic.models.Artist
@@ -39,7 +28,6 @@ import dev.jigen.zimusic.models.EventWithSong
 import dev.jigen.zimusic.models.Format
 import dev.jigen.zimusic.models.Info
 import dev.jigen.zimusic.models.Lyrics
-import dev.jigen.zimusic.models.PipedSession
 import dev.jigen.zimusic.models.Playlist
 import dev.jigen.zimusic.models.PlaylistPreview
 import dev.jigen.zimusic.models.PlaylistWithSongs
@@ -336,9 +324,6 @@ interface Database {
 
     @Query("UPDATE Song SET totalPlayTimeMs = totalPlayTimeMs + :addition WHERE id = :id")
     fun incrementTotalPlayTimeMs(id: String, addition: Long)
-
-    @Query("SELECT * FROM PipedSession")
-    fun pipedSessions(): Flow<List<PipedSession>>
 
     @Query("SELECT * FROM Playlist WHERE id = :id")
     fun playlist(id: Long): Flow<Playlist?>
@@ -747,9 +732,6 @@ interface Database {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     fun insert(artists: List<Artist>, songArtistMaps: List<SongArtistMap>)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insert(pipedSession: PipedSession)
-
     @Transaction
     fun insert(mediaItem: MediaItem, block: (Song) -> Song = { it }) {
         val existingLikedAt = getLikedAtSync(mediaItem.mediaId)
@@ -830,9 +812,6 @@ interface Database {
     @Delete
     fun delete(songPlaylistMap: SongPlaylistMap)
 
-    @Delete
-    fun delete(pipedSession: PipedSession)
-
     @RawQuery
     fun raw(supportSQLiteQuery: SupportSQLiteQuery): Int
 
@@ -854,39 +833,12 @@ interface Database {
         QueuedMediaItem::class,
         Format::class,
         Event::class,
-        Lyrics::class,
-        PipedSession::class
+        Lyrics::class
     ],
     views = [SortedSongPlaylistMap::class],
-    version = 33,
+    version = 1,
     exportSchema = true,
-    autoMigrations = [
-        AutoMigration(from = 1, to = 2),
-        AutoMigration(from = 2, to = 3),
-        AutoMigration(from = 3, to = 4, spec = DatabaseInitializer.From3To4Migration::class),
-        AutoMigration(from = 4, to = 5),
-        AutoMigration(from = 5, to = 6),
-        AutoMigration(from = 6, to = 7),
-        AutoMigration(from = 7, to = 8, spec = DatabaseInitializer.From7To8Migration::class),
-        AutoMigration(from = 9, to = 10),
-        AutoMigration(from = 11, to = 12, spec = DatabaseInitializer.From11To12Migration::class),
-        AutoMigration(from = 12, to = 13),
-        AutoMigration(from = 13, to = 14),
-        AutoMigration(from = 15, to = 16),
-        AutoMigration(from = 16, to = 17),
-        AutoMigration(from = 17, to = 18),
-        AutoMigration(from = 18, to = 19),
-        AutoMigration(from = 19, to = 20),
-        AutoMigration(from = 20, to = 21, spec = DatabaseInitializer.From20To21Migration::class),
-        AutoMigration(from = 21, to = 22, spec = DatabaseInitializer.From21To22Migration::class),
-        AutoMigration(from = 23, to = 24),
-        AutoMigration(from = 24, to = 25),
-        AutoMigration(from = 25, to = 26),
-        AutoMigration(from = 26, to = 27),
-        AutoMigration(from = 27, to = 28),
-        AutoMigration(from = 28, to = 29),
-        AutoMigration(from = 29, to = 30)
-    ]
+    autoMigrations = []
 )
 @TypeConverters(Converters::class)
 abstract class DatabaseInitializer protected constructor() : RoomDatabase() {
@@ -902,16 +854,6 @@ abstract class DatabaseInitializer protected constructor() : RoomDatabase() {
                 klass = DatabaseInitializer::class.java,
                 name = "data.db"
             )
-            .addMigrations(
-                From8To9Migration(),
-                From10To11Migration(),
-                From14To15Migration(),
-                From22To23Migration(),
-                From23To24Migration(),
-                From30To31Migration(),
-                From31To32Migration(),
-                From32To33Migration()
-            )
             .build()
 
         operator fun invoke() {
@@ -923,274 +865,6 @@ abstract class DatabaseInitializer protected constructor() : RoomDatabase() {
         }
     }
 
-    @DeleteTable.Entries(DeleteTable(tableName = "QueuedMediaItem"))
-    class From3To4Migration : AutoMigrationSpec
-
-    @RenameColumn.Entries(RenameColumn("Song", "albumInfoId", "albumId"))
-    class From7To8Migration : AutoMigrationSpec
-
-    class From8To9Migration : Migration(8, 9) {
-        override fun migrate(db: SupportSQLiteDatabase) {
-            db.query(
-                SimpleSQLiteQuery(
-                    query = "SELECT DISTINCT browseId, text, Info.id FROM Info JOIN Song ON Info.id = Song.albumId;"
-                )
-            ).use { cursor ->
-                val albumValues = ContentValues(2)
-                while (cursor.moveToNext()) {
-                    albumValues.put("id", cursor.getString(0))
-                    albumValues.put("title", cursor.getString(1))
-                    db.insert("Album", CONFLICT_IGNORE, albumValues)
-
-                    db.execSQL(
-                        "UPDATE Song SET albumId = '${cursor.getString(0)}' WHERE albumId = ${
-                            cursor.getLong(
-                                2
-                            )
-                        }"
-                    )
-                }
-            }
-
-            db.query(
-                SimpleSQLiteQuery(
-                    query = """
-                        SELECT GROUP_CONCAT(text, ''), SongWithAuthors.songId FROM Info
-                        JOIN SongWithAuthors ON Info.id = SongWithAuthors.authorInfoId
-                        GROUP BY songId;
-                    """.trimIndent()
-                )
-            ).use { cursor ->
-                val songValues = ContentValues(1)
-                while (cursor.moveToNext()) {
-                    songValues.put("artistsText", cursor.getString(0))
-                    db.update(
-                        table = "Song",
-                        conflictAlgorithm = CONFLICT_IGNORE,
-                        values = songValues,
-                        whereClause = "id = ?",
-                        whereArgs = arrayOf(cursor.getString(1))
-                    )
-                }
-            }
-
-            db.query(
-                SimpleSQLiteQuery(
-                    query = """
-                        SELECT browseId, text, Info.id FROM Info
-                        JOIN SongWithAuthors ON Info.id = SongWithAuthors.authorInfoId
-                        WHERE browseId NOT NULL;
-                    """.trimIndent()
-                )
-            ).use { cursor ->
-                val artistValues = ContentValues(2)
-                while (cursor.moveToNext()) {
-                    artistValues.put("id", cursor.getString(0))
-                    artistValues.put("name", cursor.getString(1))
-                    db.insert("Artist", CONFLICT_IGNORE, artistValues)
-
-                    db.execSQL(
-                        "UPDATE SongWithAuthors SET authorInfoId = '${cursor.getString(0)}' WHERE authorInfoId = ${
-                            cursor.getLong(2)
-                        }"
-                    )
-                }
-            }
-
-            db.execSQL("INSERT INTO SongArtistMap(songId, artistId) SELECT songId, authorInfoId FROM SongWithAuthors")
-
-            db.execSQL("DROP TABLE Info;")
-            db.execSQL("DROP TABLE SongWithAuthors;")
-        }
-    }
-
-    class From10To11Migration : Migration(10, 11) {
-        override fun migrate(db: SupportSQLiteDatabase) {
-            db.query(SimpleSQLiteQuery("SELECT id, albumId FROM Song;")).use { cursor ->
-                val songAlbumMapValues = ContentValues(2)
-                while (cursor.moveToNext()) {
-                    songAlbumMapValues.put("songId", cursor.getString(0))
-                    songAlbumMapValues.put("albumId", cursor.getString(1))
-                    db.insert("SongAlbumMap", CONFLICT_IGNORE, songAlbumMapValues)
-                }
-            }
-
-            db.execSQL(
-                """
-                CREATE TABLE IF NOT EXISTS `Song_new` (
-                    `id` TEXT NOT NULL,
-                    `title` TEXT NOT NULL,
-                    `artistsText` TEXT,
-                    `durationText` TEXT NOT NULL,
-                    `thumbnailUrl` TEXT, `lyrics` TEXT,
-                    `likedAt` INTEGER,
-                    `totalPlayTimeMs` INTEGER NOT NULL,
-                    `loudnessDb` REAL,
-                    `contentLength` INTEGER,
-                    PRIMARY KEY(`id`)
-                )
-                """.trimIndent()
-            )
-
-            db.execSQL(
-                """
-                    INSERT INTO Song_new(id, title, artistsText, durationText, thumbnailUrl, lyrics,
-                    likedAt, totalPlayTimeMs, loudnessDb, contentLength) SELECT id, title, artistsText,
-                    durationText, thumbnailUrl, lyrics, likedAt, totalPlayTimeMs, loudnessDb, contentLength
-                    FROM Song;
-                """.trimIndent()
-            )
-            db.execSQL("DROP TABLE Song;")
-            db.execSQL("ALTER TABLE Song_new RENAME TO Song;")
-        }
-    }
-
-    @RenameTable("SongInPlaylist", "SongPlaylistMap")
-    @RenameTable("SortedSongInPlaylist", "SortedSongPlaylistMap")
-    class From11To12Migration : AutoMigrationSpec
-
-    class From14To15Migration : Migration(14, 15) {
-        override fun migrate(db: SupportSQLiteDatabase) {
-            db.query(SimpleSQLiteQuery("SELECT id, loudnessDb, contentLength FROM Song;"))
-                .use { cursor ->
-                    val formatValues = ContentValues(3)
-                    while (cursor.moveToNext()) {
-                        formatValues.put("songId", cursor.getString(0))
-                        formatValues.put("loudnessDb", cursor.getFloatOrNull(1))
-                        formatValues.put("contentLength", cursor.getFloatOrNull(2))
-                        db.insert("Format", CONFLICT_IGNORE, formatValues)
-                    }
-                }
-
-            db.execSQL(
-                """
-                    CREATE TABLE IF NOT EXISTS `Song_new` (
-                        `id` TEXT NOT NULL,
-                        `title` TEXT NOT NULL,
-                        `artistsText` TEXT,
-                        `durationText` TEXT NOT NULL,
-                        `thumbnailUrl` TEXT,
-                        `lyrics` TEXT,
-                        `likedAt` INTEGER,
-                        `totalPlayTimeMs` INTEGER NOT NULL,
-                        PRIMARY KEY(`id`)
-                    )
-                """.trimIndent()
-            )
-
-            db.execSQL(
-                """
-                    INSERT INTO Song_new(id, title, artistsText, durationText, thumbnailUrl, lyrics, likedAt, totalPlayTimeMs)
-                    SELECT id, title, artistsText, durationText, thumbnailUrl, lyrics, likedAt, totalPlayTimeMs
-                    FROM Song;
-                """.trimIndent()
-            )
-            db.execSQL("DROP TABLE Song;")
-            db.execSQL("ALTER TABLE Song_new RENAME TO Song;")
-        }
-    }
-
-    @DeleteColumn.Entries(
-        DeleteColumn("Artist", "shuffleVideoId"),
-        DeleteColumn("Artist", "shufflePlaylistId"),
-        DeleteColumn("Artist", "radioVideoId"),
-        DeleteColumn("Artist", "radioPlaylistId")
-    )
-    class From20To21Migration : AutoMigrationSpec
-
-    @DeleteColumn.Entries(DeleteColumn("Artist", "info"))
-    class From21To22Migration : AutoMigrationSpec
-
-    class From22To23Migration : Migration(22, 23) {
-        override fun migrate(db: SupportSQLiteDatabase) {
-            db.execSQL(
-                """
-                    CREATE TABLE IF NOT EXISTS Lyrics (
-                        `songId` TEXT NOT NULL,
-                        `fixed` TEXT,
-                        `synced` TEXT,
-                        PRIMARY KEY(`songId`),
-                        FOREIGN KEY(`songId`) REFERENCES `Song`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
-                    )
-                """.trimIndent()
-            )
-
-            db.query(SimpleSQLiteQuery("SELECT id, lyrics, synchronizedLyrics FROM Song;"))
-                .use { cursor ->
-                    val lyricsValues = ContentValues(3)
-                    while (cursor.moveToNext()) {
-                        lyricsValues.put("songId", cursor.getString(0))
-                        lyricsValues.put("fixed", cursor.getString(1))
-                        lyricsValues.put("synced", cursor.getString(2))
-                        db.insert("Lyrics", CONFLICT_IGNORE, lyricsValues)
-                    }
-                }
-
-            db.execSQL(
-                """
-                    CREATE TABLE IF NOT EXISTS Song_new (
-                        `id` TEXT NOT NULL,
-                        `title` TEXT NOT NULL,
-                        `artistsText` TEXT,
-                        `durationText` TEXT,
-                        `thumbnailUrl` TEXT,
-                        `likedAt` INTEGER,
-                        `totalPlayTimeMs` INTEGER NOT NULL,
-                        PRIMARY KEY(`id`)
-                    )
-                """.trimIndent()
-            )
-            db.execSQL(
-                """
-                    INSERT INTO Song_new(id, title, artistsText, durationText, thumbnailUrl, likedAt, totalPlayTimeMs)
-                    SELECT id, title, artistsText, durationText, thumbnailUrl, likedAt, totalPlayTimeMs
-                    FROM Song;
-                """.trimIndent()
-            )
-            db.execSQL("DROP TABLE Song;")
-            db.execSQL("ALTER TABLE Song_new RENAME TO Song;")
-        }
-    }
-
-    class From23To24Migration : Migration(23, 24) {
-        override fun migrate(db: SupportSQLiteDatabase) =
-            db.execSQL("ALTER TABLE Song ADD COLUMN loudnessBoost REAL")
-    }
-
-    class From30To31Migration : Migration(30, 31) {
-        override fun migrate(db: SupportSQLiteDatabase) {
-            db.execSQL("ALTER TABLE Song ADD COLUMN album TEXT")
-        }
-    }
-
-    class From31To32Migration : Migration(31, 32) {
-        override fun migrate(db: SupportSQLiteDatabase) {
-            db.execSQL("""
-                CREATE TABLE SongPlaylistMap_new (
-                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                    `songId` TEXT NOT NULL,
-                    `playlistId` INTEGER NOT NULL,
-                    `position` INTEGER NOT NULL,
-                    FOREIGN KEY(`songId`) REFERENCES `Song`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
-                    FOREIGN KEY(`playlistId`) REFERENCES `Playlist`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
-                )
-            """.trimIndent())
-            db.execSQL("""
-                INSERT INTO SongPlaylistMap_new (songId, playlistId, position)
-                SELECT songId, playlistId, position FROM SongPlaylistMap
-            """.trimIndent())
-            db.execSQL("DROP TABLE SongPlaylistMap")
-            db.execSQL("ALTER TABLE SongPlaylistMap_new RENAME TO SongPlaylistMap")
-            db.execSQL("CREATE INDEX `index_SongPlaylistMap_songId` ON `SongPlaylistMap` (`songId`)")
-            db.execSQL("CREATE INDEX `index_SongPlaylistMap_playlistId` ON `SongPlaylistMap` (`playlistId`)")
-        }
-    }
-
-    class From32To33Migration : Migration(32, 33) {
-        override fun migrate(db: SupportSQLiteDatabase) {
-            db.execSQL("ALTER TABLE Playlist ADD COLUMN sortable INTEGER NOT NULL DEFAULT 1")
-        }
-    }
 }
 
 @Suppress("unused")

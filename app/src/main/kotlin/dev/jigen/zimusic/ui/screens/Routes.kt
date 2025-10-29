@@ -13,7 +13,6 @@ import dev.jigen.zimusic.preferences.DataPreferences
 import dev.jigen.zimusic.query
 import dev.jigen.zimusic.ui.screens.album.AlbumScreen
 import dev.jigen.zimusic.ui.screens.artist.ArtistScreen
-import dev.jigen.zimusic.ui.screens.pipedplaylist.PipedPlaylistScreen
 import dev.jigen.zimusic.ui.screens.playlist.PlaylistScreen
 import dev.jigen.zimusic.ui.screens.search.SearchScreen
 import dev.jigen.zimusic.ui.screens.searchresult.SearchResultScreen
@@ -22,12 +21,9 @@ import dev.jigen.zimusic.ui.screens.settings.SettingsScreen
 import dev.jigen.zimusic.utils.toast
 import dev.jigen.compose.routing.Route0
 import dev.jigen.compose.routing.Route1
-import dev.jigen.compose.routing.Route3
 import dev.jigen.compose.routing.Route4
 import dev.jigen.compose.routing.RouteHandlerScope
 import dev.jigen.core.data.enums.BuiltInPlaylist
-import io.ktor.http.Url
-import java.util.UUID
 
 /**
  * Marker class for linters that a composable is a route and should not be handled like a regular
@@ -42,7 +38,6 @@ val artistRoute = Route1<String>("artistRoute")
 val builtInPlaylistRoute = Route1<BuiltInPlaylist>("builtInPlaylistRoute")
 val localPlaylistRoute = Route1<Long>("localPlaylistRoute")
 val logsRoute = Route0("logsRoute")
-val pipedPlaylistRoute = Route3<String, String, String>("pipedPlaylistRoute")
 val playlistRoute = Route4<String, String?, Int?, Boolean>("playlistRoute")
 val moodRoute = Route1<Mood>("moodRoute")
 val searchResultRoute = Route1<String>("searchResultRoute")
@@ -64,17 +59,6 @@ fun RouteHandlerScope.GlobalRoutes() {
 
     logsRoute {
         LogsScreen()
-    }
-
-    pipedPlaylistRoute { apiBaseUrl, sessionToken, playlistId ->
-        PipedPlaylistScreen(
-            apiBaseUrl = runCatching { Url(apiBaseUrl) }.getOrNull()
-                ?: error("Invalid apiBaseUrl: $apiBaseUrl is not a valid Url"),
-            sessionToken = sessionToken,
-            playlistId = runCatching {
-                UUID.fromString(playlistId)
-            }.getOrNull() ?: error("Invalid playlistId: $playlistId is not a valid UUID")
-        )
     }
 
     playlistRoute { browseId, params, maxDepth, shouldDedup ->

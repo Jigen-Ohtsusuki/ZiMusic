@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import dev.jigen.zimusic.Database
 import dev.jigen.zimusic.LocalPlayerAwareWindowInsets
 import dev.jigen.zimusic.R
-import dev.jigen.zimusic.models.PipedSession
 import dev.jigen.zimusic.models.Playlist
 import dev.jigen.zimusic.models.PlaylistPreview
 import dev.jigen.zimusic.preferences.DataPreferences
@@ -48,27 +47,19 @@ import dev.jigen.zimusic.ui.components.themed.VerticalDivider
 import dev.jigen.zimusic.ui.items.PlaylistItem
 import dev.jigen.zimusic.ui.screens.Route
 import dev.jigen.zimusic.ui.screens.builtinplaylist.BuiltInPlaylistScreen
-import dev.jigen.zimusic.ui.screens.settings.SettingsEntryGroupText
-import dev.jigen.zimusic.ui.screens.settings.SettingsGroupSpacer
-import dev.jigen.compose.persist.persist
 import dev.jigen.compose.persist.persistList
 import dev.jigen.core.data.enums.BuiltInPlaylist
 import dev.jigen.core.data.enums.PlaylistSortBy
 import dev.jigen.core.data.enums.SortOrder
 import dev.jigen.core.ui.Dimensions
 import dev.jigen.core.ui.LocalAppearance
-import dev.jigen.providers.piped.Piped
-import dev.jigen.providers.piped.models.Session
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.async
-import dev.jigen.providers.piped.models.PlaylistPreview as PipedPlaylistPreview
 
 @Route
 @Composable
 fun HomePlaylists(
     onBuiltInPlaylist: (BuiltInPlaylist) -> Unit,
     onPlaylistClick: (Playlist) -> Unit,
-    onPipedPlaylistClick: (Session, PipedPlaylistPreview) -> Unit,
     onSearchClick: () -> Unit
 ) = with(OrderPreferences) {
     val (colorPalette) = LocalAppearance.current
@@ -85,22 +76,11 @@ fun HomePlaylists(
         }
     )
     var items by persistList<PlaylistPreview>("home/playlists")
-    var pipedSessions by persist<Map<PipedSession, List<PipedPlaylistPreview>?>>("home/piped")
 
     LaunchedEffect(playlistSortBy, playlistSortOrder) {
         Database.instance
             .playlistPreviews(playlistSortBy, playlistSortOrder)
             .collect { items = it.toImmutableList() }
-    }
-
-    LaunchedEffect(Unit) {
-        Database.instance.pipedSessions().collect { sessions ->
-            pipedSessions = sessions.associateWith { session ->
-                async {
-                    Piped.playlist.list(session = session.toApiSession())?.getOrNull()
-                }
-            }.mapValues { (_, value) -> value.await() }
-        }
     }
 
     val sortOrderIconRotation by animateFloatAsState(
@@ -251,44 +231,6 @@ fun HomePlaylists(
                         .animateItem(fadeInSpec = null, fadeOutSpec = null)
                 )
             }
-
-            pipedSessions
-                ?.ifEmpty { null }
-                ?.filter { it.value?.isNotEmpty() == true }
-                ?.forEach { (session, playlists) ->
-                    item(
-                        key = "piped-header-${session.username}",
-                        contentType = 0,
-                        span = { GridItemSpan(maxLineSpan) }
-                    ) {
-                        SettingsGroupSpacer()
-                        SettingsEntryGroupText(title = session.username)
-                    }
-
-                    playlists?.let {
-                        items(
-                            items = playlists,
-                            key = { "piped-${session.username}-${it.id}" }
-                        ) { playlist ->
-                            PlaylistItem(
-                                name = playlist.name,
-                                songCount = playlist.videoCount,
-                                channelName = null,
-                                thumbnailUrl = playlist.thumbnailUrl.toString(),
-                                thumbnailSize = Dimensions.thumbnails.playlist,
-                                alternative = UIStatePreferences.playlistsAsGrid,
-                                modifier = Modifier
-                                    .clickable(onClick = {
-                                        onPipedPlaylistClick(
-                                            session.toApiSession(),
-                                            playlist
-                                        )
-                                    })
-                                    .animateItem(fadeInSpec = null, fadeOutSpec = null)
-                            )
-                        }
-                    }
-                }
         }
 
         FloatingActionsContainerWithScrollToTop(

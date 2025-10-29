@@ -9,48 +9,55 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicText
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.password
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.fastForEachIndexed
 import androidx.credentials.CredentialManager
-import dev.jigen.compose.persist.persistList
 import dev.jigen.core.ui.LocalAppearance
-import dev.jigen.providers.piped.Piped
-import dev.jigen.providers.piped.models.Instance
-import dev.jigen.zimusic.Database
 import dev.jigen.zimusic.LocalCredentialManager
 import dev.jigen.zimusic.R
 import dev.jigen.zimusic.features.import.CsvPlaylistParser
 import dev.jigen.zimusic.features.import.ImportStatus
 import dev.jigen.zimusic.features.import.PlaylistImporter
 import dev.jigen.zimusic.features.import.SongImportInfo
-import dev.jigen.zimusic.models.PipedSession
-import dev.jigen.zimusic.transaction
-import dev.jigen.zimusic.ui.components.themed.*
+import dev.jigen.zimusic.ui.components.themed.DefaultDialog
+import dev.jigen.zimusic.ui.components.themed.DialogTextButton
+import dev.jigen.zimusic.ui.components.themed.TextField
 import dev.jigen.zimusic.ui.screens.Route
-import dev.jigen.zimusic.utils.*
-import io.ktor.http.Url
-import kotlinx.collections.immutable.toImmutableList
+import dev.jigen.zimusic.utils.semiBold
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,17 +70,12 @@ fun SyncSettings(
     val (colorPalette, typography) = LocalAppearance.current
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
-    val pipedSessions by Database.instance.pipedSessions().collectAsState(initial = listOf())
 
     // CSV Import State
     var showingColumnMappingDialog by remember { mutableStateOf<Pair<Uri, List<String>>?>(null) }
     var showingNameDialog by remember { mutableStateOf<List<SongImportInfo>?>(null) }
     var showingImportDialog by remember { mutableStateOf(false) }
     var importStatus by remember { mutableStateOf<ImportStatus>(ImportStatus.Idle) }
-
-    // Piped State
-    var linkingPiped by remember { mutableStateOf(false) }
-    var deletingPipedSession: Int? by rememberSaveable { mutableStateOf(null) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -327,201 +329,6 @@ fun SyncSettings(
         }
     }
 
-    // Piped Dialog 1: Linking
-    if (linkingPiped) DefaultDialog(
-        onDismiss = { linkingPiped = false },
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        var isLoading by rememberSaveable { mutableStateOf(false) }
-        var hasError by rememberSaveable { mutableStateOf(false) }
-        var successful by remember { mutableStateOf(false) }
-
-        when {
-            successful -> BasicText(
-                text = stringResource(R.string.piped_session_created_successfully),
-                style = typography.xs.semiBold.center,
-                modifier = Modifier.padding(all = 24.dp)
-            )
-
-            hasError -> ConfirmationDialogBody(
-                text = stringResource(R.string.error_piped_link),
-                onDismiss = { },
-                onCancel = { linkingPiped = false },
-                onConfirm = { hasError = false }
-            )
-
-            isLoading -> CircularProgressIndicator(modifier = Modifier.padding(all = 8.dp))
-
-            else -> Box(modifier = Modifier.fillMaxWidth()) {
-                var backgroundLoading by rememberSaveable { mutableStateOf(false) }
-                if (backgroundLoading) CircularProgressIndicator(modifier = Modifier.align(Alignment.TopEnd))
-
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    var instances by persistList<Instance>(tag = "settings/sync/piped/instances")
-                    var loadingInstances by rememberSaveable { mutableStateOf(true) }
-                    var selectedInstance: Int? by rememberSaveable { mutableStateOf(null) }
-                    var username by rememberSaveable { mutableStateOf("") }
-                    var password by rememberSaveable { mutableStateOf("") }
-                    var canSelect by rememberSaveable { mutableStateOf(true) }
-                    var instancesUnavailable by rememberSaveable { mutableStateOf(false) }
-                    var customInstance: String? by rememberSaveable { mutableStateOf(null) }
-
-                    LaunchedEffect(Unit) {
-                        Piped.getInstances()?.getOrNull()?.let {
-                            selectedInstance = null
-                            instances = it.toImmutableList()
-                            canSelect = true
-                        } ?: run { instancesUnavailable = true }
-                        loadingInstances = false
-
-                        backgroundLoading = true
-                        runCatching {
-                            credentialManager.get(context)?.let {
-                                username = it.id
-                                password = it.password
-                            }
-                        }.getOrNull()
-                        backgroundLoading = false
-                    }
-
-                    BasicText(
-                        text = stringResource(R.string.piped),
-                        style = typography.m.semiBold
-                    )
-
-                    if (customInstance == null) ValueSelectorSettingsEntry(
-                        title = stringResource(R.string.instance),
-                        selectedValue = selectedInstance,
-                        values = instances.indices.toImmutableList(),
-                        onValueSelect = { selectedInstance = it },
-                        valueText = { idx ->
-                            idx?.let { instances.getOrNull(it)?.name }
-                                ?: if (instancesUnavailable) stringResource(R.string.error_piped_instances_unavailable)
-                                else stringResource(R.string.click_to_select)
-                        },
-                        isEnabled = !instancesUnavailable && canSelect,
-                        usePadding = false,
-                        trailingContent = if (loadingInstances) {
-                            { CircularProgressIndicator() }
-                        } else null
-                    )
-                    SwitchSettingsEntry(
-                        title = stringResource(R.string.custom_instance),
-                        text = null,
-                        isChecked = customInstance != null,
-                        onCheckedChange = {
-                            customInstance = if (customInstance == null) "" else null
-                        },
-                        usePadding = false
-                    )
-                    customInstance?.let { instance ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        TextField(
-                            value = instance,
-                            onValueChange = { customInstance = it },
-                            hintText = stringResource(R.string.base_api_url),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextField(
-                        value = username,
-                        onValueChange = { username = it },
-                        hintText = stringResource(R.string.username),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    TextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        hintText = stringResource(R.string.password),
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(
-                            autoCorrectEnabled = false,
-                            keyboardType = KeyboardType.Password
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .semantics {
-                                password()
-                            }
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    DialogTextButton(
-                        text = stringResource(R.string.login),
-                        primary = true,
-                        enabled = (customInstance?.isNotBlank() == true || selectedInstance != null) &&
-                            username.isNotBlank() && password.isNotBlank(),
-                        onClick = {
-                            @Suppress("Wrapping")
-                            (customInstance?.let {
-                                runCatching {
-                                    Url(it)
-                                }.getOrNull() ?: runCatching {
-                                    Url("https://$it")
-                                }.getOrNull()
-                            } ?: selectedInstance?.let { instances[it].apiBaseUrl })?.let { url ->
-                                coroutineScope.launch {
-                                    isLoading = true
-                                    val session = Piped.login(
-                                        apiBaseUrl = url,
-                                        username = username,
-                                        password = password
-                                    )?.getOrNull()
-                                    isLoading = false
-                                    if (session == null) {
-                                        hasError = true
-                                        return@launch
-                                    }
-
-                                    transaction {
-                                        Database.instance.insert(
-                                            PipedSession(
-                                                apiBaseUrl = session.apiBaseUrl,
-                                                username = username,
-                                                token = session.token
-                                            )
-                                        )
-                                    }
-
-                                    successful = true
-
-                                    runCatching {
-                                        credentialManager.upsert(
-                                            context = context,
-                                            username = username,
-                                            password = password
-                                        )
-                                    }
-
-                                    linkingPiped = false
-                                }
-                            }
-                        },
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
-                    )
-                }
-            }
-        }
-    }
-
-    // Piped Dialog 2: Deleting
-    if (deletingPipedSession != null) ConfirmationDialog(
-        text = stringResource(R.string.confirm_delete_piped_session),
-        onDismiss = {
-            deletingPipedSession = null
-        },
-        onConfirm = {
-            deletingPipedSession?.let {
-                transaction { Database.instance.delete(pipedSessions[it]) }
-            }
-        }
-    )
-
     SettingsCategoryScreen(title = stringResource(R.string.sync)) {
         SettingsDescription(text = stringResource(R.string.sync_description))
         SettingsGroup(title = stringResource(R.string.local_import)) {
@@ -539,41 +346,6 @@ fun SyncSettings(
                     )
                 }
             )
-        }
-        SettingsGroup(title = stringResource(R.string.piped)) {
-            SettingsEntry(
-                title = stringResource(R.string.add_account),
-                text = stringResource(R.string.add_account_description),
-                onClick = { linkingPiped = true }
-            )
-            SettingsEntry(
-                title = stringResource(R.string.learn_more),
-                text = stringResource(R.string.learn_more_description),
-                onClick = { uriHandler.openUri(context.getString(R.string.piped_learn_more_url)) }
-            )
-        }
-        SettingsGroup(title = stringResource(R.string.piped_sessions)) {
-            if (pipedSessions.isEmpty()) {
-                SettingsGroupSpacer()
-                BasicText(
-                    text = stringResource(R.string.no_items_found),
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                    style = typography.s.semiBold.center
-                )
-            } else pipedSessions.fastForEachIndexed { i, session ->
-                SettingsEntry(
-                    title = session.username,
-                    text = session.apiBaseUrl.toString(),
-                    onClick = { },
-                    trailingContent = {
-                        IconButton(
-                            onClick = { deletingPipedSession = i },
-                            icon = R.drawable.delete,
-                            color = colorPalette.text
-                        )
-                    }
-                )
-            }
         }
     }
 }

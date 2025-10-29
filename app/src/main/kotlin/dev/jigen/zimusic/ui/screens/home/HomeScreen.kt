@@ -18,7 +18,6 @@ import dev.jigen.zimusic.ui.screens.mood.MoodScreen
 import dev.jigen.zimusic.ui.screens.mood.MoreAlbumsScreen
 import dev.jigen.zimusic.ui.screens.mood.MoreMoodsScreen
 import dev.jigen.zimusic.ui.screens.moodRoute
-import dev.jigen.zimusic.ui.screens.pipedPlaylistRoute
 import dev.jigen.zimusic.ui.screens.playlistRoute
 import dev.jigen.zimusic.ui.screens.searchRoute
 import dev.jigen.zimusic.ui.screens.settingsRoute
@@ -109,13 +108,6 @@ fun HomeScreen() {
                         3 -> HomePlaylists(
                             onBuiltInPlaylist = { builtInPlaylistRoute(it) },
                             onPlaylistClick = { localPlaylistRoute(it.id) },
-                            onPipedPlaylistClick = { session, playlist ->
-                                pipedPlaylistRoute(
-                                    p0 = session.apiBaseUrl.toString(),
-                                    p1 = session.token,
-                                    p2 = playlist.id.toString()
-                                )
-                            },
                             onSearchClick = onSearchClick
                         )
 

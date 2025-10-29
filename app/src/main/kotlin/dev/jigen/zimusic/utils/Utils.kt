@@ -22,7 +22,6 @@ import dev.jigen.core.ui.utils.SongBundleAccessor
 import dev.jigen.providers.innertube.Innertube
 import dev.jigen.providers.innertube.models.bodies.ContinuationBody
 import dev.jigen.providers.innertube.requests.playlistPage
-import dev.jigen.providers.piped.models.Playlist
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onEach
@@ -81,32 +80,6 @@ val Innertube.VideoItem.asMediaItem: MediaItem
         )
         .build()
 
-val Playlist.Video.asMediaItem: MediaItem?
-    get() {
-        val key = id ?: return null
-
-        return MediaItem.Builder()
-            .setMediaId(key)
-            .setUri(key)
-            .setCustomCacheKey(key)
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(title)
-                    .setArtist(uploaderName)
-                    .setArtworkUri(Uri.parse(thumbnailUrl.toString()))
-                    .setExtras(
-                        SongBundleAccessor.bundle {
-                            durationText = duration.toComponents { minutes, seconds, _ ->
-                                "$minutes:${seconds.toString().padStart(2, '0')}"
-                            }
-                            artistNames = listOf(uploaderName)
-                            artistIds = uploaderId?.let { listOf(it) }
-                        }
-                    )
-                    .build()
-            )
-            .build()
-    }
 
 val Song.asMediaItem: MediaItem
     get() = MediaItem.Builder()
