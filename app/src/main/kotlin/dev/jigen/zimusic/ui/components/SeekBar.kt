@@ -7,7 +7,6 @@ import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.expandVertically
@@ -32,8 +31,10 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,12 +62,11 @@ import dev.jigen.zimusic.preferences.PlayerPreferences
 import dev.jigen.zimusic.service.PlayerService
 import dev.jigen.zimusic.utils.formatAsDuration
 import dev.jigen.zimusic.utils.semiBold
-import kotlin.math.abs
+import kotlinx.coroutines.launch
 import kotlin.math.PI
-import kotlin.math.sin
+import kotlin.math.abs
 import kotlin.math.roundToLong
-
-// TODO: de-couple from binder
+import kotlin.math.sin
 
 @Composable
 fun SeekBar(
@@ -85,27 +85,43 @@ fun SeekBar(
 ) {
     var scrubbingPosition by remember(media) { mutableStateOf<Long?>(null) }
 
+    // Tracks when the user last let go of the bar (drag or tap)
+    var lastInteractionTime by remember { mutableLongStateOf(0L) }
+
     val animatedPosition = remember { Animatable(position.toFloat()) }
+    val scope = rememberCoroutineScope()
 
-    // This logic now uses a spring for seeks/jumps and a tween for smooth playback
     LaunchedEffect(position, scrubbingPosition) {
-        val targetValue = scrubbingPosition?.toFloat() ?: position.toFloat()
+        // 1. If dragging, snap immediately to finger
+        if (scrubbingPosition != null) {
+            animatedPosition.snapTo(scrubbingPosition!!.toFloat())
+            return@LaunchedEffect
+        }
 
-        if (scrubbingPosition != null || abs(targetValue - animatedPosition.targetValue) > 2000) {
-            // Use a spring for quick, natural animation when seeking or for large jumps
-            animatedPosition.animateTo(targetValue, animationSpec = spring())
+        // 2. Interaction Lock: Ignore player updates for 350ms after a drag/tap
+        // This prevents the bar from jumping back to the old time before the seek completes
+        val timeSinceInteraction = System.currentTimeMillis() - lastInteractionTime
+        if (timeSinceInteraction < 350L) {
+            return@LaunchedEffect
+        }
+
+        // 3. Normal Playback: Snap if jump is huge (bg resume), else animate smooth
+        val target = position.toFloat()
+        val current = animatedPosition.value
+
+        if (abs(target - current) > 2000) {
+            animatedPosition.snapTo(target)
         } else {
-            // Use a linear animation for smooth, continuous playback
             animatedPosition.animateTo(
-                targetValue = targetValue,
+                targetValue = target,
                 animationSpec = tween(durationMillis = 1000, easing = LinearEasing)
             )
         }
     }
 
-
     var isDragging by remember { mutableStateOf(false) }
 
+    // -- Drag Logic --
     val onSeekStart: (Long) -> Unit = { scrubbingPosition = it }
     val onSeek: (Long) -> Unit = { delta ->
         scrubbingPosition = if (media.duration == C.TIME_UNSET) null
@@ -114,6 +130,24 @@ fun SeekBar(
     val onSeekEnd = {
         scrubbingPosition?.let(binder.player::seekTo)
         scrubbingPosition = null
+        lastInteractionTime = System.currentTimeMillis()
+    }
+
+    // -- Tap Logic --
+    val onTap: (Long) -> Unit = { time ->
+        // Lock the periodic updates so our custom animation isn't interrupted
+        lastInteractionTime = System.currentTimeMillis()
+
+        // 1. Very quickly animate the visual scrubber to the tap point (150ms)
+        scope.launch {
+            animatedPosition.animateTo(
+                targetValue = time.toFloat(),
+                animationSpec = tween(durationMillis = 150, easing = LinearEasing)
+            )
+        }
+
+        // 2. Actually seek the player
+        binder.player.seekTo(time)
     }
 
     val innerModifier = modifier
@@ -131,8 +165,7 @@ fun SeekBar(
         .pointerInput(range) {
             detectTaps(
                 range = range,
-                onSeekStart = onSeekStart,
-                onSeekEnd = onSeekEnd
+                onTap = onTap
             )
         }
 
@@ -192,14 +225,13 @@ private fun DottedSeekBarBody(
     dotCount: Int = 36
 ) {
     val transition = updateTransition(targetState = isDragging, label = "isDragging")
-    // Animate the bar to be slightly thicker when dragging for better feedback
     val barHeight by transition.animateDp(label = "barHeight") { if (it) 24.dp else 16.dp }
 
     Column(modifier = modifier) {
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(24.dp) // Keep a larger height for easier touch interaction
+                .height(24.dp)
         ) {
             if (duration == 0L) return@Canvas
 
@@ -212,7 +244,6 @@ private fun DottedSeekBarBody(
             val progress = (position.toFloat() / duration).coerceIn(0f, 1f)
             val progressWidth = canvasWidth * progress
 
-            // First, draw all the faint dots to form the background track
             for (i in 0 until dotCount) {
                 val dotCenterX = i * (2 * dotRadius + spacing) + dotRadius
                 drawCircle(
@@ -222,12 +253,11 @@ private fun DottedSeekBarBody(
                 )
             }
 
-            // Second, draw the solid white progress bar on top of the dots
             drawRoundRect(
-                color = Color.White,
+                color = color, // Changed from Color.White to color
                 topLeft = Offset(x = 0f, y = (canvasHeight - barHeightPx) / 2),
                 size = Size(width = progressWidth, height = barHeightPx),
-                cornerRadius = CornerRadius(barHeightPx / 2) // Makes the bar have rounded ends
+                cornerRadius = CornerRadius(barHeightPx / 2)
             )
         }
 
@@ -426,7 +456,7 @@ private suspend fun PointerInputScope.detectDrags(
     onSeek: (delta: Long) -> Unit,
     onSeekEnd: () -> Unit
 ) {
-    var acc = 0f
+    val accumulator = object { var value = 0f }
 
     detectHorizontalDragGestures(
         onDragStart = { offset ->
@@ -434,22 +464,20 @@ private suspend fun PointerInputScope.detectDrags(
             onSeekStart((offset.x / size.width * (range.endInclusive - range.start).toFloat() + range.start).roundToLong())
         },
         onHorizontalDrag = { _, delta ->
-            acc += delta / size.width * (range.endInclusive - range.start).toFloat()
+            accumulator.value += delta / size.width * (range.endInclusive - range.start).toFloat()
 
-            if (acc !in -1f..1f) {
-                onSeek(acc.toLong())
-                acc -= acc.toLong()
+            if (accumulator.value !in -1f..1f) {
+                val step = accumulator.value.toLong()
+                onSeek(step)
+                accumulator.value -= step
             }
         },
         onDragEnd = {
             setIsDragging(false)
-            acc = 0f
             onSeekEnd()
         },
         onDragCancel = {
             setIsDragging(false)
-            acc = 0f
-
             onSeekEnd()
         }
     )
@@ -457,17 +485,14 @@ private suspend fun PointerInputScope.detectDrags(
 
 private suspend fun PointerInputScope.detectTaps(
     range: ClosedRange<Long>,
-    onSeekStart: (updated: Long) -> Unit,
-    onSeekEnd: () -> Unit
+    onTap: (Long) -> Unit
 ) {
     if (range.endInclusive < range.start) return
 
     detectTapGestures(
         onTap = { offset ->
-            onSeekStart(
-                (offset.x / size.width * (range.endInclusive - range.start).toFloat() + range.start).roundToLong()
-            )
-            onSeekEnd()
+            val targetTime = (offset.x / size.width * (range.endInclusive - range.start).toFloat() + range.start).roundToLong()
+            onTap(targetTime)
         }
     )
 }
