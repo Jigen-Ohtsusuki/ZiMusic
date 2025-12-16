@@ -28,7 +28,6 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import okhttp3.Protocol
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.net.Proxy
@@ -40,17 +39,21 @@ internal val json = Json {
 }
 
 object Innertube {
-
     private var httpClient = createClient()
-    var proxy: Proxy? = null
+
+    var proxy: Proxy?
+        get() = YouTube.proxy
         set(value) {
-            field = value
+            YouTube.proxy = value
             httpClient.close()
             httpClient = createClient()
         }
 
     @OptIn(ExperimentalSerializationApi::class)
     private fun createClient() = HttpClient(OkHttp) {
+        engine {
+            preconfigured = YouTube.client
+        }
         expectSuccess = true
 
         install(ContentNegotiation) {
@@ -72,18 +75,13 @@ object Innertube {
             socketTimeoutMillis = 15000
         }
 
-        if (proxy != null) {
-            engine {
-                proxy = this@Innertube.proxy
-            }
-        }
-
         defaultRequest {
             url("https://music.youtube.com/youtubei/v1/")
         }
     }
 
     private const val API_KEY = "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30"
+
     private val OriginInterceptor = createClientPlugin("OriginInterceptor") {
         client.sendPipeline.intercept(HttpSendPipeline.State) {
             context.headers {
@@ -95,13 +93,16 @@ object Innertube {
                 val origin = "${context.url.protocol.name}://$host"
                 set("origin", origin)
                 set("referer", "$origin/")
-
             }
         }
     }
 
     val logger: Logger = LoggerFactory.getLogger(Innertube::class.java)
+
     val baseClient = HttpClient(OkHttp) {
+        engine {
+            preconfigured = YouTube.client
+        }
         expectSuccess = true
 
         HttpResponseValidator {
@@ -109,7 +110,6 @@ object Innertube {
                 val ex = cause as? ResponseException ?: return@handleResponseExceptionWithRequest
                 val code = ex.response.status.value
 
-                // Log rate limiting and auth errors
                 when (code) {
                     403 -> logger.warn("Access forbidden (403) - possible rate limiting or auth issue")
                     429 -> logger.warn("Too many requests (429) - rate limited")
@@ -133,20 +133,6 @@ object Innertube {
         }
 
         install(OriginInterceptor)
-
-        engine {
-            val modernSpec = okhttp3.ConnectionSpec.Builder(okhttp3.ConnectionSpec.MODERN_TLS)
-                .tlsVersions(okhttp3.TlsVersion.TLS_1_3, okhttp3.TlsVersion.TLS_1_2)
-                .build()
-            config {
-                connectionSpecs(listOf(modernSpec, okhttp3.ConnectionSpec.CLEARTEXT))
-                protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
-
-                connectTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
-                readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                writeTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
-            }
-        }
     }
 
     val client = baseClient.config {
@@ -154,7 +140,6 @@ object Innertube {
             url(scheme = "https", host = "music.youtube.com") {
                 contentType(ContentType.Application.Json)
                 headers {
-                    // Use consistent working API key
                     set("X-Goog-Api-Key", API_KEY)
                     set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0")
                     set("Accept", "application/json")

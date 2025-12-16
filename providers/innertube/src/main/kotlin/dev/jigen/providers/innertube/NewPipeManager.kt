@@ -1,10 +1,9 @@
 package dev.jigen.providers.innertube
 
 import dev.jigen.providers.innertube.models.PlayerResponse
+import dev.jigen.providers.innertube.models.UserAgents
 import io.ktor.http.URLBuilder
 import io.ktor.http.parseQueryString
-import dev.jigen.providers.innertube.models.UserAgents
-import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.downloader.CancellableCall
@@ -15,13 +14,8 @@ import org.schabi.newpipe.extractor.exceptions.ParsingException
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
 import org.schabi.newpipe.extractor.services.youtube.YoutubeJavaScriptPlayerManager
 import java.io.IOException
-import java.net.Proxy
 
-private class NewPipeDownloaderImpl(proxy: Proxy?) : Downloader() {
-
-    private val client = OkHttpClient.Builder()
-        .proxy(proxy)
-        .build()
+private class NewPipeDownloaderImpl : Downloader() {
 
     @Throws(IOException::class, ReCaptchaException::class)
     override fun execute(request: Request): Response {
@@ -46,30 +40,37 @@ private class NewPipeDownloaderImpl(proxy: Proxy?) : Downloader() {
             }
         }
 
+        // Inherit connection pool and proxy settings from the central client
+        val client = YouTube.client.newBuilder().build()
         val response = client.newCall(requestBuilder.build()).execute()
 
         if (response.code == 429) {
             response.close()
-
             throw ReCaptchaException("reCaptcha Challenge requested", url)
         }
 
         val responseBodyToReturn = response.body?.string()
-
         val latestUrl = response.request.url.toString()
-        return Response(response.code, response.message, response.headers.toMultimap(), responseBodyToReturn, responseBodyToReturn?.toByteArray(), latestUrl)
+
+        return Response(
+            response.code,
+            response.message,
+            response.headers.toMultimap(),
+            responseBodyToReturn,
+            responseBodyToReturn?.toByteArray(),
+            latestUrl
+        )
     }
 
     override fun executeAsync(request: Request, callback: AsyncCallback?): CancellableCall {
         TODO("Placeholder")
     }
-
 }
 
 object NewPipeUtils {
 
     init {
-        NewPipe.init(NewPipeDownloaderImpl(YouTube.proxy))
+        NewPipe.init(NewPipeDownloaderImpl())
     }
 
     fun getStreamUrl(format: PlayerResponse.StreamingData.Format, videoId: String): Result<String> =
@@ -95,5 +96,4 @@ object NewPipeUtils {
                 url
             )
         }
-
 }
