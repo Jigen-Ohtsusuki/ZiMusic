@@ -64,17 +64,17 @@ private fun lightColorPalette(source: Hsl) = ColorPalette(
     background0 = Color.hsl(
         hue = source.hue,
         saturation = source.saturation.coerceAtMost(0.1f),
-        lightness = 0.925f
+        lightness = 0.9f
     ),
     background1 = Color.hsl(
         hue = source.hue,
         saturation = source.saturation.coerceAtMost(0.3f),
-        lightness = 0.90f
+        lightness = 0.875f
     ),
     background2 = Color.hsl(
         hue = source.hue,
         saturation = source.saturation.coerceAtMost(0.4f),
-        lightness = 0.85f
+        lightness = 0.8f
     ),
     text = Color.hsl(
         hue = source.hue,
@@ -94,7 +94,7 @@ private fun lightColorPalette(source: Hsl) = ColorPalette(
     accent = Color.hsl(
         hue = source.hue,
         saturation = (source.saturation + 0.1f).coerceIn(0.45f, 0.7f),
-        lightness = 0.5f
+        lightness = 0.35f
     ),
     onAccent = Color.White,
     isDefault = false,
