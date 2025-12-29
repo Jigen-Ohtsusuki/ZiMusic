@@ -89,6 +89,7 @@ import dev.jigen.providers.sponsorblock.SponsorBlock
 import dev.jigen.providers.sponsorblock.models.Action
 import dev.jigen.providers.sponsorblock.models.Category
 import dev.jigen.providers.sponsorblock.requests.segments
+import dev.jigen.zimusic.audio.HighResAudioProcessor
 import dev.jigen.zimusic.Database
 import dev.jigen.zimusic.MainActivity
 import dev.jigen.zimusic.R
@@ -1089,7 +1090,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                 )
                 .setAudioProcessorChain(
                     DefaultAudioProcessorChain(
-                        arrayOf(),
+                        arrayOf(HighResAudioProcessor()),
                         SilenceSkippingAudioProcessor(
                             /* minimumSilenceDurationUs = */ minimumSilenceDuration,
                             /* silenceRetentionRatio = */ 0.01f,
