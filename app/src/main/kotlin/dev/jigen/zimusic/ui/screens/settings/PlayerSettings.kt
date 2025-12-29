@@ -18,14 +18,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
+import dev.jigen.core.ui.utils.isAtLeastAndroid6
 import dev.jigen.zimusic.LocalPlayerServiceBinder
 import dev.jigen.zimusic.R
+import dev.jigen.zimusic.audio.HighResAudioProcessor
 import dev.jigen.zimusic.preferences.PlayerPreferences
 import dev.jigen.zimusic.service.PlayerService
 import dev.jigen.zimusic.ui.components.themed.SecondaryTextButton
 import dev.jigen.zimusic.ui.screens.Route
 import dev.jigen.zimusic.utils.rememberEqualizerLauncher
-import dev.jigen.core.ui.utils.isAtLeastAndroid6
 
 @OptIn(UnstableApi::class)
 @Route
@@ -132,6 +133,25 @@ fun PlayerSettings() = with(PlayerPreferences) {
                     range = -20f..20f,
                     steps = 79,
                     showTicks = false
+                )
+            }
+
+            var highResEnabled by remember { mutableStateOf(HighResAudioProcessor.ENABLED) }
+            SwitchSettingsEntry(
+                title = stringResource(R.string.high_res_audio),
+                text = stringResource(R.string.high_res_audio_desc),
+                isChecked = highResEnabled,
+                onCheckedChange = {
+                    highResEnabled = it
+                    HighResAudioProcessor.ENABLED = it
+                    changed = true
+                }
+            )
+
+            AnimatedVisibility(visible = highResEnabled) {
+                SettingsDescription(
+                    text = stringResource(R.string.high_res_battery_warning),
+                    important = true,
                 )
             }
 

@@ -13,6 +13,10 @@ import kotlin.math.max
 @UnstableApi
 class HighResAudioProcessor : AudioProcessor {
 
+    companion object {
+        var ENABLED = false
+    }
+
     private var inputAudioFormat: AudioFormat = AudioFormat.NOT_SET
     private var outputAudioFormat: AudioFormat = AudioFormat.NOT_SET
     private var buffer: ByteBuffer = AudioProcessor.EMPTY_BUFFER
@@ -47,7 +51,9 @@ class HighResAudioProcessor : AudioProcessor {
     private var highPassSide = 0.0
 
     override fun configure(inputAudioFormat: AudioFormat): AudioFormat {
-        // Force everything to 16-bit PCM (what we actually process)
+        // If disabled, we don't change the format
+        if (!ENABLED) return AudioFormat.NOT_SET
+
         return if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) {
             AudioFormat(
                 inputAudioFormat.sampleRate,
@@ -62,8 +68,10 @@ class HighResAudioProcessor : AudioProcessor {
         }
     }
 
-    override fun isActive(): Boolean =
-        inputAudioFormat.encoding != C.ENCODING_INVALID
+    override fun isActive(): Boolean {
+        // If disabled, ExoPlayer will bypass this processor entirely
+        return ENABLED && inputAudioFormat.encoding != C.ENCODING_INVALID
+    }
 
     override fun queueInput(inputBuffer: ByteBuffer) {
         inputBuffer.order(ByteOrder.nativeOrder())

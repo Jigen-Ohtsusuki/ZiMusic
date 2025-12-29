@@ -379,6 +379,9 @@
     <string name="share_lyrics">Share lyrics</string>
     <string name="lyrics_share_limit_reached">You can select up to 6 lines.</string>
     <string name="share">Share</string>
+    <string name="high_res_audio">High-Resolution Audio</string>
+    <string name="high_res_audio_desc">Enable 32-bit internal processing with analog warmth and soundstage widening.</string>
+    <string name="high_res_battery_warning">May increase battery usage.</string>
     <plurals name="format_reset_blacklist_description">
         <item quantity="one">Remove %1$s song from the blacklist</item>
         <item quantity="other">Remove all %1$s songs from the blacklist</item>
