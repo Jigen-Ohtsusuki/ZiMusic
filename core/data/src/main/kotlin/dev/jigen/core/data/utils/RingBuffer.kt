@@ -1,10 +1,12 @@
 @file:Suppress("DEPRECATION")
+@file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package dev.jigen.core.data.utils
 
 import android.net.Uri
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlin.collections.find
 
 open class RingBuffer<T>(val size: Int, private val init: (index: Int) -> T) : Iterable<T> {
     private val list = MutableList(size, init)

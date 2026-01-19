@@ -188,8 +188,6 @@ dependencies {
     implementation(projects.providers.kugou)
     implementation(projects.providers.lrclib)
     implementation(projects.providers.lyricsplus)
-    implementation(projects.providers.sponsorblock)
-    implementation(projects.providers.translate)
     implementation(projects.core.data)
     implementation(projects.core.ui)
     implementation(libs.ktor.client.cio)

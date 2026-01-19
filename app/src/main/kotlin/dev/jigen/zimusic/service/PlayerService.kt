@@ -13,9 +13,7 @@ import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.MediaDescription
 import android.media.MediaMetadata
-import android.media.audiofx.BassBoost
 import android.media.audiofx.LoudnessEnhancer
-import android.media.audiofx.PresetReverb
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Bundle
@@ -32,13 +30,12 @@ import androidx.core.content.ContextCompat.startForegroundService
 import androidx.core.content.getSystemService
 import androidx.core.net.toUri
 import androidx.media3.common.AudioAttributes
-import androidx.media3.common.AuxEffectInfo
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
-import androidx.media3.common.audio.SonicAudioProcessor
+import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
@@ -58,17 +55,14 @@ import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioOffloadSupportProvider
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink.DefaultAudioProcessorChain
-import androidx.media3.exoplayer.audio.SilenceSkippingAudioProcessor
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.extractor.DefaultExtractorsFactory
-import io.ktor.client.plugins.ClientRequestException
 import dev.jigen.compose.preferences.SharedPreferencesProperty
 import dev.jigen.core.data.enums.ExoPlayerDiskCacheSize
 import dev.jigen.core.data.utils.UriCache
 import dev.jigen.core.ui.utils.EqualizerIntentBundleAccessor
 import dev.jigen.core.ui.utils.isAtLeastAndroid10
-import dev.jigen.core.ui.utils.isAtLeastAndroid12
 import dev.jigen.core.ui.utils.isAtLeastAndroid13
 import dev.jigen.core.ui.utils.isAtLeastAndroid6
 import dev.jigen.core.ui.utils.isAtLeastAndroid8
@@ -85,13 +79,10 @@ import dev.jigen.providers.innertube.models.bodies.SearchBody
 import dev.jigen.providers.innertube.requests.player
 import dev.jigen.providers.innertube.requests.searchPage
 import dev.jigen.providers.innertube.utils.from
-import dev.jigen.providers.sponsorblock.SponsorBlock
-import dev.jigen.providers.sponsorblock.models.Action
-import dev.jigen.providers.sponsorblock.models.Category
-import dev.jigen.providers.sponsorblock.requests.segments
 import dev.jigen.zimusic.Database
 import dev.jigen.zimusic.MainActivity
 import dev.jigen.zimusic.R
+import dev.jigen.zimusic.audio.HighResAudioProcessor
 import dev.jigen.zimusic.models.Event
 import dev.jigen.zimusic.models.QueuedMediaItem
 import dev.jigen.zimusic.models.Song
@@ -122,20 +113,17 @@ import dev.jigen.zimusic.utils.intent
 import dev.jigen.zimusic.utils.mediaItems
 import dev.jigen.zimusic.utils.progress
 import dev.jigen.zimusic.utils.retryIf
-import dev.jigen.zimusic.utils.setPlaybackPitch
 import dev.jigen.zimusic.utils.shouldBePlaying
 import dev.jigen.zimusic.utils.thumbnail
 import dev.jigen.zimusic.utils.timer
-import dev.jigen.zimusic.utils.toast
 import dev.jigen.zimusic.utils.withFallback
+import io.ktor.client.plugins.ClientRequestException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -150,22 +138,20 @@ import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.yield
-import kotlinx.datetime.Clock
 import java.io.IOException
 import kotlin.math.roundToInt
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.ExperimentalTime
 import android.os.Binder as AndroidBinder
 
 const val LOCAL_KEY_PREFIX = "local:"
@@ -211,9 +197,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
     private val stateBuilder
         get() = PlaybackState.Builder().setActions(
-            defaultActions.let {
-                if (isAtLeastAndroid12) it or PlaybackState.ACTION_SET_PLAYBACK_SPEED else it
-            }
+            defaultActions
         ).addCustomAction(
             PlaybackState.CustomAction.Builder(
                 /* action = */ LIKE_ACTION,
@@ -240,8 +224,6 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
     private val coroutineScope = CoroutineScope(Dispatchers.IO + Job())
     private var preferenceUpdaterJob: Job? = null
-    private var volumeNormalizationJob: Job? = null
-    private var sponsorBlockJob: Job? = null
 
     override var isInvincibilityEnabled by mutableStateOf(false)
 
@@ -249,8 +231,6 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
     private var audioDeviceCallback: AudioDeviceCallback? = null
 
     private var loudnessEnhancer: LoudnessEnhancer? = null
-    private var bassBoost: BassBoost? = null
-    private var reverb: PresetReverb? = null
 
     private val binder = Binder()
 
@@ -319,7 +299,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             .setUsePlatformDiagnostics(false)
             .build()
             .apply {
-                skipSilenceEnabled = PlayerPreferences.skipSilence
+                skipSilenceEnabled = false // Forced FALSE for 32-bit
                 addListener(this@PlayerService)
                 addAnalyticsListener(
                     PlaybackStatsListener(
@@ -340,11 +320,10 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         }
 
         coroutineScope.launch {
-            var first = true
+            val first = true
             combine(mediaItemState, isLikedState) { mediaItem, _ ->
                 // work around NPE in other processes
                 if (first) {
-                    first = false
                     return@combine
                 }
 
@@ -367,31 +346,17 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             subscribe(AppearancePreferences.isShowingThumbnailInLockscreenProperty) {
                 maybeShowSongCoverInLockScreen()
             }
-
-            subscribe(PlayerPreferences.bassBoostLevelProperty) { maybeBassBoost() }
-            subscribe(PlayerPreferences.bassBoostProperty) { maybeBassBoost() }
-            subscribe(PlayerPreferences.reverbProperty) { maybeReverb() }
             subscribe(PlayerPreferences.isInvincibilityEnabledProperty) {
                 this@PlayerService.isInvincibilityEnabled = it
-            }
-            subscribe(PlayerPreferences.pitchProperty) {
-                player.setPlaybackPitch(it.coerceAtLeast(0.01f))
             }
             subscribe(PlayerPreferences.queueLoopEnabledProperty) { updateRepeatMode() }
             subscribe(PlayerPreferences.resumePlaybackWhenDeviceConnectedProperty) {
                 maybeResumePlaybackWhenDeviceConnected()
             }
-            subscribe(PlayerPreferences.skipSilenceProperty) { player.skipSilenceEnabled = it }
-            subscribe(PlayerPreferences.speedProperty) {
-                player.setPlaybackSpeed(it.coerceAtLeast(0.01f))
-            }
             subscribe(PlayerPreferences.trackLoopEnabledProperty) {
                 updateRepeatMode()
                 updateNotification()
             }
-            subscribe(PlayerPreferences.volumeNormalizationBaseGainProperty) { maybeNormalizeVolume() }
-            subscribe(PlayerPreferences.volumeNormalizationProperty) { maybeNormalizeVolume() }
-            subscribe(PlayerPreferences.sponsorBlockEnabledProperty) { maybeSponsorBlock() }
 
             launch {
                 val audioManager = getSystemService<AudioManager>()
@@ -509,7 +474,6 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         }
 
         maybeRecoverPlaybackError()
-        maybeNormalizeVolume()
         maybeProcessRadio()
 
         with(bitmapProvider) {
@@ -666,171 +630,6 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                     startForeground()
                 }
             }
-        }
-    }
-
-    private fun maybeNormalizeVolume() {
-        if (!PlayerPreferences.volumeNormalization) {
-            loudnessEnhancer?.enabled = false
-            loudnessEnhancer?.release()
-            loudnessEnhancer = null
-            volumeNormalizationJob?.cancel()
-            volumeNormalizationJob?.invokeOnCompletion { volumeNormalizationJob = null }
-            player.volume = 1f
-            return
-        }
-
-        runCatching {
-            if (loudnessEnhancer == null) loudnessEnhancer = LoudnessEnhancer(player.audioSessionId)
-        }.onFailure { return }
-
-        val songId = player.currentMediaItem?.mediaId ?: return
-        volumeNormalizationJob?.cancel()
-        volumeNormalizationJob = coroutineScope.launch {
-            runCatching {
-                fun Float?.toMb() = ((this ?: 0f) * 100).toInt()
-
-                Database.instance.loudnessDb(songId).cancellable().collectLatest { loudness ->
-                    val loudnessMb = loudness.toMb().let {
-                        if (it !in -2000..2000) {
-                            withContext(Dispatchers.Main) {
-                                toast(
-                                    getString(
-                                        R.string.loudness_normalization_extreme,
-                                        getString(R.string.format_db, (it / 100f).toString())
-                                    )
-                                )
-                            }
-
-                            0
-                        } else it
-                    }
-
-                    Database.instance.loudnessBoost(songId).cancellable().collectLatest { boost ->
-                        withContext(Dispatchers.Main) {
-                            loudnessEnhancer?.setTargetGain(
-                                PlayerPreferences.volumeNormalizationBaseGain.toMb() + boost.toMb() - loudnessMb
-                            )
-                            loudnessEnhancer?.enabled = true
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    @Suppress("CyclomaticComplexMethod") // TODO: evaluate CyclomaticComplexMethod threshold
-    private fun maybeSponsorBlock() {
-        poiTimestamp = null
-
-        if (!PlayerPreferences.sponsorBlockEnabled) {
-            sponsorBlockJob?.cancel()
-            sponsorBlockJob?.invokeOnCompletion { sponsorBlockJob = null }
-            return
-        }
-
-        sponsorBlockJob?.cancel()
-        sponsorBlockJob = coroutineScope.launch {
-            mediaItemState.onStart { emit(mediaItemState.value) }.collectLatest { mediaItem ->
-                poiTimestamp = null
-                val videoId = mediaItem?.mediaId
-                    ?.removePrefix("https://youtube.com/watch?v=")
-                    ?.takeIf { it.isNotBlank() } ?: return@collectLatest
-
-                SponsorBlock
-                    .segments(videoId)
-                    ?.onSuccess { segments ->
-                        poiTimestamp =
-                            segments.find { it.category == Category.PoiHighlight }?.start?.inWholeMilliseconds
-                    }
-                    ?.map { segments ->
-                        segments
-                            .sortedBy { it.start.inWholeMilliseconds }
-                            .filter { it.action == Action.Skip }
-                    }
-                    ?.mapCatching { segments ->
-                        suspend fun posMillis() =
-                            withContext(Dispatchers.Main) { player.currentPosition }
-
-                        suspend fun speed() =
-                            withContext(Dispatchers.Main) { player.playbackParameters.speed }
-
-                        suspend fun seek(millis: Long) =
-                            withContext(Dispatchers.Main) { player.seekTo(millis) }
-
-                        val ctx = currentCoroutineContext()
-                        val lastSegmentEnd =
-                            segments.lastOrNull()?.end?.inWholeMilliseconds ?: return@mapCatching
-
-                        @Suppress("LoopWithTooManyJumpStatements")
-                        do {
-                            if (lastSegmentEnd < posMillis()) {
-                                yield()
-                                continue
-                            }
-
-                            val nextSegment =
-                                segments.firstOrNull { posMillis() < it.end.inWholeMilliseconds }
-                                    ?: continue
-
-                            // Wait for next segment
-                            if (nextSegment.start.inWholeMilliseconds > posMillis()) {
-                                val timeNextSegment = nextSegment.start.inWholeMilliseconds - posMillis()
-                                val speed = speed().toDouble()
-                                delay((timeNextSegment / speed).milliseconds)
-                            }
-
-                            if (posMillis().milliseconds !in nextSegment.start..nextSegment.end) {
-                                // Player is not in the segment for some reason, maybe the user seeked in the meantime
-                                yield()
-                                continue
-                            }
-
-                            seek(nextSegment.end.inWholeMilliseconds)
-                        } while (ctx.isActive)
-                    }?.onFailure {
-                        it.printStackTrace()
-                    }
-            }
-        }
-    }
-
-    private fun maybeBassBoost() {
-        if (!PlayerPreferences.bassBoost) {
-            runCatching {
-                bassBoost?.enabled = false
-                bassBoost?.release()
-            }
-            bassBoost = null
-            maybeNormalizeVolume()
-            return
-        }
-
-        runCatching {
-            if (bassBoost == null) bassBoost = BassBoost(0, player.audioSessionId)
-            bassBoost?.setStrength(PlayerPreferences.bassBoostLevel.toShort())
-            bassBoost?.enabled = true
-        }.onFailure {
-            toast(getString(R.string.error_bassboost_init))
-        }
-    }
-
-    private fun maybeReverb() {
-        if (PlayerPreferences.reverb == PlayerPreferences.Reverb.None) {
-            runCatching {
-                reverb?.enabled = false
-                player.clearAuxEffectInfo()
-                reverb?.release()
-            }
-            reverb = null
-            return
-        }
-
-        runCatching {
-            if (reverb == null) reverb = PresetReverb(1, player.audioSessionId)
-            reverb?.preset = PlayerPreferences.reverb.preset
-            reverb?.enabled = true
-            reverb?.id?.let { player.setAuxEffectInfo(AuxEffectInfo(it, 1f)) }
         }
     }
 
@@ -1078,27 +877,20 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             enableFloatOutput: Boolean,
             enableAudioTrackPlaybackParams: Boolean
         ): AudioSink {
-            val minimumSilenceDuration =
-                PlayerPreferences.minimumSilence.coerceIn(1000L..2_000_000L)
-
             return DefaultAudioSink.Builder(applicationContext)
-                .setEnableFloatOutput(enableFloatOutput)
+                .setEnableFloatOutput(true)
                 .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                 .setAudioOffloadSupportProvider(
                     DefaultAudioOffloadSupportProvider(applicationContext)
                 )
                 .setAudioProcessorChain(
-                    DefaultAudioProcessorChain(
-                        arrayOf(),
-                        SilenceSkippingAudioProcessor(
-                            /* minimumSilenceDurationUs = */ minimumSilenceDuration,
-                            /* silenceRetentionRatio = */ 0.01f,
-                            /* maxSilenceToKeepDurationUs = */ minimumSilenceDuration,
-                            /* minVolumeToKeepPercentageWhenMuting = */ 0,
-                            /* silenceThresholdLevel = */ 256
-                        ),
-                        SonicAudioProcessor()
-                    )
+                    object : DefaultAudioProcessorChain(
+                        HighResAudioProcessor()
+                    ) {
+                        override fun getAudioProcessors(): Array<out AudioProcessor> {
+                            return arrayOf(HighResAudioProcessor())
+                        }
+                    }
                 )
                 .build()
                 .apply {
@@ -1269,10 +1061,6 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         override fun onSkipToQueueItem(id: Long) =
             runCatching { player.seekToDefaultPosition(id.toInt()) }.let { }
 
-        override fun onSetPlaybackSpeed(speed: Float) {
-            PlayerPreferences.speed = speed.coerceIn(0.01f..2f)
-        }
-
         override fun onPlayFromSearch(query: String?, extras: Bundle?) {
             if (query.isNullOrBlank()) return
             binder.playFromSearch(query)
@@ -1337,6 +1125,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             SimpleCache(directory, cacheEvictor, createDatabaseProvider(context))
         }
 
+        @kotlin.OptIn(ExperimentalTime::class)
         @Suppress("CyclomaticComplexMethod", "TooGenericExceptionCaught")
         fun createYouTubeDataSourceResolverFactory(
             context: Context,

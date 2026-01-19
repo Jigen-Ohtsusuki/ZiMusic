@@ -503,49 +503,7 @@ fun Player(
             }
         }
 
-        var audioDialogOpen by rememberSaveable { mutableStateOf(false) }
-
-        if (audioDialogOpen) SliderDialog(
-            onDismiss = { audioDialogOpen = false },
-            title = stringResource(R.string.playback_settings)
-        ) {
-            SliderDialogBody(
-                provideState = { remember(speed) { mutableFloatStateOf(speed) } },
-                onSlideComplete = { speed = it },
-                min = 0f,
-                max = 2f,
-                toDisplay = {
-                    if (it <= 0.01f) stringResource(R.string.minimum_speed_value)
-                    else stringResource(R.string.format_multiplier, "%.2f".format(it))
-                },
-                steps = 39,
-                label = stringResource(R.string.playback_speed)
-            )
-            SliderDialogBody(
-                provideState = { remember(pitch) { mutableFloatStateOf(pitch) } },
-                onSlideComplete = { pitch = it },
-                min = 0f,
-                max = 2f,
-                toDisplay = {
-                    if (it <= 0.01f) stringResource(R.string.minimum_speed_value)
-                    else stringResource(R.string.format_multiplier, "%.2f".format(it))
-                },
-                steps = 39,
-                label = stringResource(R.string.playback_pitch)
-            )
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                SecondaryTextButton(
-                    text = stringResource(R.string.reset),
-                    onClick = {
-                        speed = 1f
-                        pitch = 1f
-                    }
-                )
-            }
-        }
+        // REMOVED: Speed/Pitch Slider Dialog Logic
 
         var boostDialogOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -560,7 +518,7 @@ fun Player(
             }
 
             SliderDialog(
-                onDismiss = { boostDialogOpen = false },
+                onDismiss = {},
                 title = stringResource(R.string.volume_boost)
             ) {
                 SliderDialogBody(
@@ -618,10 +576,6 @@ fun Player(
                                     onDismiss = menuState::hide,
                                     mediaItem = it,
                                     binder = binder,
-                                    onShowSpeedDialog = { audioDialogOpen = true },
-                                    onShowNormalizationDialog = {
-                                        boostDialogOpen = true
-                                    }.takeIf { volumeNormalization }
                                 )
                             }
                         }
@@ -643,7 +597,6 @@ private fun PlayerMenu(
     binder: PlayerService.Binder,
     mediaItem: MediaItem,
     onDismiss: () -> Unit,
-    onShowSpeedDialog: (() -> Unit)? = null,
     onShowNormalizationDialog: (() -> Unit)? = null
 ) {
     val launchEqualizer by rememberEqualizerLauncher(audioSessionId = { binder.player.audioSessionId })
@@ -658,7 +611,7 @@ private fun PlayerMenu(
         onGoToEqualizer = launchEqualizer,
         onShowSleepTimer = {},
         onDismiss = onDismiss,
-        onShowSpeedDialog = onShowSpeedDialog,
+        onShowSpeedDialog = null,
         onShowNormalizationDialog = onShowNormalizationDialog
     )
 }
