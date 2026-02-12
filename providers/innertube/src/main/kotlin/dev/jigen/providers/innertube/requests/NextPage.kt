@@ -13,13 +13,15 @@ import io.ktor.client.request.setBody
 
 suspend fun Innertube.nextPage(body: NextBody): Result<Innertube.NextPage>? =
     runCatchingCancellable {
-        val response = client.post(NEXT) {
-            setBody(body)
-            @Suppress("all")
-            mask(
-                "contents.singleColumnMusicWatchNextResultsRenderer.tabbedRenderer.watchNextTabbedResultsRenderer.tabs.tabRenderer.content.musicQueueRenderer.content.playlistPanelRenderer(continuations,contents(automixPreviewVideoRenderer,$PLAYLIST_PANEL_VIDEO_RENDERER_MASK))"
-            )
-        }.body<NextResponse>()
+        val response = Innertube.withRetry {
+            client.post(NEXT) {
+                setBody(body)
+                @Suppress("all")
+                mask(
+                    "contents.singleColumnMusicWatchNextResultsRenderer.tabbedRenderer.watchNextTabbedResultsRenderer.tabs.tabRenderer.content.musicQueueRenderer.content.playlistPanelRenderer(continuations,contents(automixPreviewVideoRenderer,$PLAYLIST_PANEL_VIDEO_RENDERER_MASK))"
+                )
+            }.body<NextResponse>()
+        }
 
         val tabs = response
             .contents
@@ -64,13 +66,15 @@ suspend fun Innertube.nextPage(body: NextBody): Result<Innertube.NextPage>? =
     }
 
 suspend fun Innertube.nextPage(body: ContinuationBody) = runCatchingCancellable {
-    val response = client.post(NEXT) {
-        setBody(body)
-        @Suppress("all")
-        mask(
-            "continuationContents.playlistPanelContinuation(continuations,contents.$PLAYLIST_PANEL_VIDEO_RENDERER_MASK)"
-        )
-    }.body<ContinuationResponse>()
+    val response = Innertube.withRetry {
+        client.post(NEXT) {
+            setBody(body)
+            @Suppress("all")
+            mask(
+                "continuationContents.playlistPanelContinuation(continuations,contents.$PLAYLIST_PANEL_VIDEO_RENDERER_MASK)"
+            )
+        }.body<ContinuationResponse>()
+    }
 
     response
         .continuationContents

@@ -15,13 +15,15 @@ suspend fun <T : Innertube.Item> Innertube.searchPage(
     body: SearchBody,
     fromMusicShelfRendererContent: (MusicShelfRenderer.Content) -> T?
 ) = runCatchingCancellable {
-    val response = client.post(SEARCH) {
-        setBody(body)
-        @Suppress("all")
-        mask(
-            "contents.tabbedSearchResultsRenderer.tabs.tabRenderer.content.sectionListRenderer.contents.musicShelfRenderer(continuations,contents.$MUSIC_RESPONSIVE_LIST_ITEM_RENDERER_MASK)"
-        )
-    }.body<SearchResponse>()
+    val response = Innertube.withRetry {
+        client.post(SEARCH) {
+            setBody(body)
+            @Suppress("all")
+            mask(
+                "contents.tabbedSearchResultsRenderer.tabs.tabRenderer.content.sectionListRenderer.contents.musicShelfRenderer(continuations,contents.$MUSIC_RESPONSIVE_LIST_ITEM_RENDERER_MASK)"
+            )
+        }.body<SearchResponse>()
+    }
 
     response
         .contents
@@ -41,13 +43,15 @@ suspend fun <T : Innertube.Item> Innertube.searchPage(
     body: ContinuationBody,
     fromMusicShelfRendererContent: (MusicShelfRenderer.Content) -> T?
 ) = runCatchingCancellable {
-    val response = client.post(SEARCH) {
-        setBody(body)
-        @Suppress("all")
-        mask(
-            "continuationContents.musicShelfContinuation(continuations,contents.$MUSIC_RESPONSIVE_LIST_ITEM_RENDERER_MASK)"
-        )
-    }.body<ContinuationResponse>()
+    val response = Innertube.withRetry {
+        client.post(SEARCH) {
+            setBody(body)
+            @Suppress("all")
+            mask(
+                "continuationContents.musicShelfContinuation(continuations,contents.$MUSIC_RESPONSIVE_LIST_ITEM_RENDERER_MASK)"
+            )
+        }.body<ContinuationResponse>()
+    }
 
     response
         .continuationContents

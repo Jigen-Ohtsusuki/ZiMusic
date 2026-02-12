@@ -9,6 +9,7 @@ agp = "8.11.1"
 
 loggingInterceptor = "5.1.0"
 material = "1.8.3"
+pipepipeextractor = "2d2d9ed"
 room = "2.7.2"
 media3 = "1.7.1"
 ktor = "3.2.2"
@@ -56,6 +57,7 @@ kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 logging-interceptor = { module = "com.squareup.okhttp3:logging-interceptor", version.ref = "loggingInterceptor" }
 material = { module = "androidx.compose.material:material", version.ref = "material" }
+pipepipeextractor = { module = "com.github.mostafaalagamy.MetrolistExtractor:PipePipeExtractor", version.ref = "pipepipeextractor" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "converterGson" }
 room = { module = "androidx.room:room-ktx", version.ref = "room" }
 room_compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
@@ -95,4 +97,3 @@ desugaring = { module = "com.android.tools:desugar_jdk_libs", version = "2.1.5" 
 
 detekt_compose = { module = "io.nlopez.compose.rules:detekt", version = "0.4.26" }
 detekt_formatting = { module = "io.gitlab.arturbosch.detekt:detekt-formatting", version.ref = "detekt" }
-newpipe-extractor = { group = "com.github.InfinityLoop1308", name = "PipePipeExtractor", version = "4240401" }

@@ -19,9 +19,11 @@ suspend fun <T : Innertube.Item> Innertube.itemsPage(
     fromListRenderer: (MusicResponsiveListItemRenderer) -> T? = { null },
     fromTwoRowRenderer: (MusicTwoRowItemRenderer) -> T? = { null }
 ) = runCatchingCancellable {
-    val response = client.post(BROWSE) {
-        setBody(body)
-    }.body<BrowseResponse>()
+    val response = Innertube.withRetry {
+        client.post(BROWSE) {
+            setBody(body)
+        }.body<BrowseResponse>()
+    }
 
     val sectionListRendererContent = response
         .contents
@@ -49,9 +51,11 @@ suspend fun <T : Innertube.Item> Innertube.itemsPage(
     fromListRenderer: (MusicResponsiveListItemRenderer) -> T? = { null },
     fromTwoRowRenderer: (MusicTwoRowItemRenderer) -> T? = { null }
 ) = runCatchingCancellable {
-    val response = client.post(BROWSE) {
-        setBody(body)
-    }.body<ContinuationResponse>()
+    val response = Innertube.withRetry {
+        client.post(BROWSE) {
+            setBody(body)
+        }.body<ContinuationResponse>()
+    }
 
     itemsPageFromMusicShelRendererOrGridRenderer(
         musicShelfRenderer = response

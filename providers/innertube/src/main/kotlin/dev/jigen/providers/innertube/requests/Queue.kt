@@ -10,10 +10,12 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 
 suspend fun Innertube.queue(body: QueueBody) = runCatchingCancellable {
-    val response = client.post(QUEUE) {
-        setBody(body)
-        mask("queueDatas.content.$PLAYLIST_PANEL_VIDEO_RENDERER_MASK")
-    }.body<GetQueueResponse>()
+    val response = Innertube.withRetry {
+        client.post(QUEUE) {
+            setBody(body)
+            mask("queueDatas.content.$PLAYLIST_PANEL_VIDEO_RENDERER_MASK")
+        }.body<GetQueueResponse>()
+    }
 
     response
         .queueData

@@ -19,17 +19,23 @@ import kotlinx.coroutines.currentCoroutineContext
 
 suspend fun Innertube.artistPage(body: BrowseBody) = runCatchingCancellable {
     val ctx = currentCoroutineContext()
-    val response = client.post(BROWSE) {
-        setBody(body)
-        mask("contents,header")
-    }.body<BrowseResponse>()
+
+    val response = Innertube.withRetry {
+        client.post(BROWSE) {
+            setBody(body)
+            mask("contents,header")
+        }.body<BrowseResponse>()
+    }
 
     val responseNoLang by lazy {
         CoroutineScope(ctx).async(start = CoroutineStart.LAZY) {
-            client.post(BROWSE) {
-                setBody(body.copy(context = Context.DefaultWebNoLang))
-                mask("contents,header")
-            }.body<BrowseResponse>()
+            // Fixed: Wrapped async request in withRetry
+            Innertube.withRetry {
+                client.post(BROWSE) {
+                    setBody(body.copy(context = Context.DefaultWebNoLang))
+                    mask("contents,header")
+                }.body<BrowseResponse>()
+            }
         }
     }
 

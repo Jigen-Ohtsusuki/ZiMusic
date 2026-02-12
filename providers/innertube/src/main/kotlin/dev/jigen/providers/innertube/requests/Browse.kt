@@ -17,9 +17,11 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 
 suspend fun Innertube.browse(body: BrowseBody) = runCatchingCancellable {
-    val response = client.post(BROWSE) {
-        setBody(body)
-    }.body<BrowseResponse>()
+    val response = Innertube.withRetry {
+        client.post(BROWSE) {
+            setBody(body)
+        }.body<BrowseResponse>()
+    }
 
     BrowseResult(
         title = response
@@ -81,7 +83,7 @@ fun MusicCarouselShelfRenderer.toBrowseItem(
             it.musicResponsiveListItemRenderer?.let { renderer ->
                 fromResponsiveListItemRenderer?.invoke(renderer)
             } ?: it.musicTwoRowItemRenderer?.toItem()
-                ?: it.musicNavigationButtonRenderer?.toItem()
+            ?: it.musicNavigationButtonRenderer?.toItem()
         }
         .orEmpty()
 )

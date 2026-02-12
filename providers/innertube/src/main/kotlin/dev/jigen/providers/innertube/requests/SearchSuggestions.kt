@@ -9,13 +9,15 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 
 suspend fun Innertube.searchSuggestions(body: SearchSuggestionsBody) = runCatchingCancellable {
-    val response = client.post(SEARCH_SUGGESTIONS) {
-        setBody(body)
-        @Suppress("all")
-        mask(
-            "contents.searchSuggestionsSectionRenderer.contents.searchSuggestionRenderer.navigationEndpoint.searchEndpoint.query"
-        )
-    }.body<SearchSuggestionsResponse>()
+    val response = Innertube.withRetry {
+        client.post(SEARCH_SUGGESTIONS) {
+            setBody(body)
+            @Suppress("all")
+            mask(
+                "contents.searchSuggestionsSectionRenderer.contents.searchSuggestionRenderer.navigationEndpoint.searchEndpoint.query"
+            )
+        }.body<SearchSuggestionsResponse>()
+    }
 
     response
         .contents

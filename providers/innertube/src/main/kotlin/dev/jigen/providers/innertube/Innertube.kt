@@ -25,11 +25,13 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.parameters
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.delay
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.io.IOException
 import java.net.Proxy
 
 internal val json = Json {
@@ -39,6 +41,26 @@ internal val json = Json {
 }
 
 object Innertube {
+    suspend fun <T> withRetry(
+        maxAttempts: Int = 3,
+        initialDelay: Long = 500L,
+        factor: Double = 2.0,
+        block: suspend () -> T,
+    ): T {
+        var currentDelay = initialDelay
+        var attempt = 0
+        while (true) {
+            try {
+                return block()
+            } catch (e: IOException) {
+                attempt++
+                if (attempt >= maxAttempts) throw e
+                delay(currentDelay)
+                currentDelay = (currentDelay * factor).toLong()
+            }
+        }
+    }
+
     private var httpClient = createClient()
 
     var proxy: Proxy?
@@ -70,9 +92,9 @@ object Innertube {
         }
 
         install(HttpTimeout) {
-            requestTimeoutMillis = 15000
-            connectTimeoutMillis = 10000
-            socketTimeoutMillis = 15000
+            requestTimeoutMillis = 60000
+            connectTimeoutMillis = 30000
+            socketTimeoutMillis = 60000
         }
 
         defaultRequest {
@@ -133,6 +155,12 @@ object Innertube {
         }
 
         install(OriginInterceptor)
+
+        install(HttpTimeout) {
+            requestTimeoutMillis = 60000
+            connectTimeoutMillis = 30000
+            socketTimeoutMillis = 60000
+        }
     }
 
     val client = baseClient.config {

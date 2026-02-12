@@ -40,9 +40,8 @@ private class NewPipeDownloaderImpl : Downloader() {
             }
         }
 
-        // Inherit connection pool and proxy settings from the central client
-        val client = YouTube.client.newBuilder().build()
-        val response = client.newCall(requestBuilder.build()).execute()
+        // Use the shared client from YouTube.kt
+        val response = YouTube.client.newCall(requestBuilder.build()).execute()
 
         if (response.code == 429) {
             response.close()
@@ -62,33 +61,53 @@ private class NewPipeDownloaderImpl : Downloader() {
         )
     }
 
-    override fun executeAsync(request: Request, callback: AsyncCallback?): CancellableCall {
-        TODO("Placeholder")
+    override fun executeAsync(request: Request, callback: AsyncCallback?): CancellableCall? {
+        return null // Safe stub to prevent crashes
     }
 }
 
 object NewPipeUtils {
+    @Volatile
+    private var isInitialized = false
+    private val initLock = Any()
 
-    init {
-        NewPipe.init(NewPipeDownloaderImpl())
+    private fun ensureInitialized() {
+        if (!isInitialized) {
+            synchronized(initLock) {
+                if (!isInitialized) {
+                    NewPipe.init(NewPipeDownloaderImpl())
+                    isInitialized = true
+                }
+            }
+        }
+    }
+
+    /**
+     * Fetches the signature timestamp required for playback authorization.
+     */
+    fun getSignatureTimestamp(videoId: String): Result<Int> = runCatching {
+        ensureInitialized()
+        YoutubeJavaScriptPlayerManager.getSignatureTimestamp(videoId)
     }
 
     fun getStreamUrl(format: PlayerResponse.StreamingData.Format, videoId: String): Result<String> =
         runCatching {
+            ensureInitialized()
             val url = format.url ?: format.signatureCipher?.let { signatureCipher ->
                 val params = parseQueryString(signatureCipher)
                 val obfuscatedSignature = params["s"]
                     ?: throw ParsingException("Could not parse cipher signature")
                 val signatureParam = params["sp"]
                     ?: throw ParsingException("Could not parse cipher signature parameter")
-                val url = params["url"]?.let { URLBuilder(it) }
+                val urlBuilder = params["url"]?.let { URLBuilder(it) }
                     ?: throw ParsingException("Could not parse cipher url")
-                url.parameters[signatureParam] =
+
+                urlBuilder.parameters[signatureParam] =
                     YoutubeJavaScriptPlayerManager.deobfuscateSignature(
                         videoId,
                         obfuscatedSignature
                     )
-                url.toString()
+                urlBuilder.toString()
             } ?: throw ParsingException("Could not find format url")
 
             return@runCatching YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(

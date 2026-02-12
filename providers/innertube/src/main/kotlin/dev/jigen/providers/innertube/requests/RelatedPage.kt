@@ -16,13 +16,15 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 
 suspend fun Innertube.relatedPage(body: NextBody) = runCatchingCancellable {
-    val nextResponse = client.post(NEXT) {
-        setBody(body.copy(context = Context.DefaultWebNoLang))
-        @Suppress("all")
-        mask(
-            "contents.singleColumnMusicWatchNextResultsRenderer.tabbedRenderer.watchNextTabbedResultsRenderer.tabs.tabRenderer(endpoint,title)"
-        )
-    }.body<NextResponse>()
+    val nextResponse = Innertube.withRetry {
+        client.post(NEXT) {
+            setBody(body.copy(context = Context.DefaultWebNoLang))
+            @Suppress("all")
+            mask(
+                "contents.singleColumnMusicWatchNextResultsRenderer.tabbedRenderer.watchNextTabbedResultsRenderer.tabs.tabRenderer(endpoint,title)"
+            )
+        }.body<NextResponse>()
+    }
 
     val browseId = nextResponse
         .contents
@@ -36,19 +38,20 @@ suspend fun Innertube.relatedPage(body: NextBody) = runCatchingCancellable {
         ?.browseEndpoint
         ?.browseId
         ?: return@runCatchingCancellable null
-
-    val response = client.post(BROWSE) {
-        setBody(
-            BrowseBody(
-                browseId = browseId,
-                context = Context.DefaultWebNoLang
+    val response = Innertube.withRetry {
+        client.post(BROWSE) {
+            setBody(
+                BrowseBody(
+                    browseId = browseId,
+                    context = Context.DefaultWebNoLang
+                )
             )
-        )
-        @Suppress("all")
-        mask(
-            "contents.sectionListRenderer.contents.musicCarouselShelfRenderer(header.musicCarouselShelfBasicHeaderRenderer(title,strapline),contents($MUSIC_RESPONSIVE_LIST_ITEM_RENDERER_MASK,$MUSIC_TWO_ROW_ITEM_RENDERER_MASK))"
-        )
-    }.body<BrowseResponse>()
+            @Suppress("all")
+            mask(
+                "contents.sectionListRenderer.contents.musicCarouselShelfRenderer(header.musicCarouselShelfBasicHeaderRenderer(title,strapline),contents($MUSIC_RESPONSIVE_LIST_ITEM_RENDERER_MASK,$MUSIC_TWO_ROW_ITEM_RENDERER_MASK))"
+            )
+        }.body<BrowseResponse>()
+    }
 
     val sectionListRenderer = response
         .contents

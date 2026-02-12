@@ -11,13 +11,15 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 
 suspend fun Innertube.lyrics(body: NextBody) = runCatchingCancellable {
-    val nextResponse = client.post(NEXT) {
-        setBody(body)
-        @Suppress("all")
-        mask(
-            "contents.singleColumnMusicWatchNextResultsRenderer.tabbedRenderer.watchNextTabbedResultsRenderer.tabs.tabRenderer(endpoint,title)"
-        )
-    }.body<NextResponse>()
+    val nextResponse = Innertube.withRetry {
+        client.post(NEXT) {
+            setBody(body)
+            @Suppress("all")
+            mask(
+                "contents.singleColumnMusicWatchNextResultsRenderer.tabbedRenderer.watchNextTabbedResultsRenderer.tabs.tabRenderer(endpoint,title)"
+            )
+        }.body<NextResponse>()
+    }
 
     val browseId = nextResponse
         .contents
@@ -31,11 +33,12 @@ suspend fun Innertube.lyrics(body: NextBody) = runCatchingCancellable {
         ?.browseEndpoint
         ?.browseId
         ?: return@runCatchingCancellable null
-
-    val response = client.post(BROWSE) {
-        setBody(BrowseBody(browseId = browseId))
-        mask("contents.sectionListRenderer.contents.musicDescriptionShelfRenderer.description")
-    }.body<BrowseResponse>()
+    val response = Innertube.withRetry {
+        client.post(BROWSE) {
+            setBody(BrowseBody(browseId = browseId))
+            mask("contents.sectionListRenderer.contents.musicDescriptionShelfRenderer.description")
+        }.body<BrowseResponse>()
+    }
 
     response.contents
         ?.sectionListRenderer

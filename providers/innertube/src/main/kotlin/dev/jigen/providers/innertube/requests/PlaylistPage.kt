@@ -15,10 +15,12 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 
 suspend fun Innertube.playlistPage(body: BrowseBody) = runCatchingCancellable {
-    val response = client.post(BROWSE) {
-        setBody(body)
-        body.context.apply()
-    }.body<BrowseResponse>()
+    val response = Innertube.withRetry {
+        client.post(BROWSE) {
+            setBody(body)
+            body.context.apply()
+        }.body<BrowseResponse>()
+    }
 
     if (response.contents?.twoColumnBrowseResultsRenderer == null) {
         val header = response
@@ -152,13 +154,15 @@ suspend fun Innertube.playlistPage(body: BrowseBody) = runCatchingCancellable {
 }
 
 suspend fun Innertube.playlistPage(body: ContinuationBody) = runCatchingCancellable {
-    val response = client.post(BROWSE) {
-        setBody(body)
-        parameter("continuation", body.continuation)
-        parameter("ctoken", body.continuation)
-        parameter("type", "next")
-        body.context.apply()
-    }.body<ContinuationResponse>()
+    val response = Innertube.withRetry {
+        client.post(BROWSE) {
+            setBody(body)
+            parameter("continuation", body.continuation)
+            parameter("ctoken", body.continuation)
+            parameter("type", "next")
+            body.context.apply()
+        }.body<ContinuationResponse>()
+    }
 
     response
         .continuationContents
