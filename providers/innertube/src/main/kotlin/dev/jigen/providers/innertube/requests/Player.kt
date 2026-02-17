@@ -22,13 +22,13 @@ private val streamValidatorClient by lazy {
         .build()
 }
 
-private val MAIN_CONTEXT = Context.DefaultIOS
+private val MAIN_CONTEXT = Context.DefaultVR
 
 private val FALLBACK_CONTEXTS = arrayOf(
+    Context.DefaultIOS,
     Context.DefaultWebNoLang,
     Context.DefaultAndroid,
     Context.DefaultTV,
-    Context.DefaultVR,
     Context.OnlyWeb,
     Context.WebCreator
 )
