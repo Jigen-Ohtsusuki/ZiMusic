@@ -7,7 +7,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import dev.jigen.core.ui.ColorPalette
-import dev.jigen.core.ui.defaultLightPalette
+import dev.jigen.core.ui.defaultDarkPalette
 import com.kieronquinn.monetcompat.core.MonetCompat
 import kotlinx.coroutines.launch
 
@@ -24,7 +24,7 @@ inline fun MonetCompat.invokeOnReady(
     }
 }
 
-fun MonetCompat.setDefaultPalette(palette: ColorPalette = defaultLightPalette) {
+fun MonetCompat.setDefaultPalette(palette: ColorPalette = defaultDarkPalette) {
     defaultAccentColor = palette.accent.toArgb()
     defaultBackgroundColor = palette.background0.toArgb()
     defaultPrimaryColor = palette.background1.toArgb()

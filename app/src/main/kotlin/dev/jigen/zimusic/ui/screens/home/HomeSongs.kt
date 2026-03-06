@@ -153,7 +153,6 @@ fun HomeSongs(
 
     Box(
         modifier = Modifier
-            .background(colorPalette.background0)
             .fillMaxSize()
     ) {
         LazyColumn(
@@ -344,7 +343,6 @@ fun HideSongDialog(
     )
 }
 
-// Row content, for convenience, doesn't need modifier/receiver
 @Suppress("UnusedReceiverParameter", "ModifierMissing")
 @Composable
 fun RowScope.HeaderSongSortBy(

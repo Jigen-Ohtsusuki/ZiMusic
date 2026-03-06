@@ -1,6 +1,6 @@
 package dev.jigen.zimusic.ui.screens.mood
 
-import androidx.compose.foundation.background
+import android.annotation.SuppressLint
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -40,12 +40,13 @@ import kotlinx.collections.immutable.toImmutableList
 
 private const val DEFAULT_BROWSE_ID = "FEmusic_new_releases_albums"
 
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun MoreAlbumsList(
     onAlbumClick: (browseId: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val (colorPalette) = LocalAppearance.current
+    val (_) = LocalAppearance.current
     val windowInsets = LocalPlayerAwareWindowInsets.current
 
     val endPaddingValues = windowInsets.only(WindowInsetsSides.End).asPaddingValues()
@@ -77,7 +78,6 @@ fun MoreAlbumsList(
             .only(WindowInsetsSides.Vertical + WindowInsetsSides.End)
             .asPaddingValues(),
         modifier = modifier
-            .background(colorPalette.background0)
             .fillMaxSize()
     ) {
         item(

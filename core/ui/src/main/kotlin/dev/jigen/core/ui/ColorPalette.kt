@@ -5,8 +5,11 @@ import android.os.Parcel
 import android.os.Parcelable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.ColorUtils
 import androidx.palette.graphics.Palette
 import kotlinx.parcelize.Parceler
 import kotlinx.parcelize.Parcelize
@@ -29,205 +32,101 @@ data class ColorPalette(
     val text: ParcelableColor,
     val textSecondary: ParcelableColor,
     val textDisabled: ParcelableColor,
-    val isDefault: Boolean,
-    val isDark: Boolean
+    val isDefault: Boolean
 ) : Parcelable
 
-private val defaultAccentColor = Color(0xff00b3a4).hsl
-val defaultLightPalette = ColorPalette(
-    background0 = Color(0xfffdfdfe),
-    background1 = Color(0xfff8f8fc),
-    background2 = Color(0xffeaeaf5),
-    text = Color(0xff212121),
-    textSecondary = Color(0xff656566),
-    textDisabled = Color(0xff9d9d9d),
-    accent = defaultAccentColor.color,
-    onAccent = Color.White,
-    isDefault = true,
-    isDark = false
-)
+private val defaultAccentColor = Color(0xff00b3a4)
 
-val defaultDarkPalette = ColorPalette(
-    background0 = Color(0xff121212),
-    background1 = Color(0xff1E1E1E),
-    background2 = Color(0xff282828),
-    text = Color(0xffe1e1e2),
-    textSecondary = Color(0xffa3a4a6),
-    textDisabled = Color(0xff6f6f73),
-    accent = defaultAccentColor.color,
-    onAccent = Color.White,
-    isDefault = true,
-    isDark = true
-)
+private fun darkColorPalette(baseColor: Color, accentColor: Color): ColorPalette {
+    // 100% MATHEMATICAL MATCH TO AURORA BACKGROUND
+    // AuroraBackground paints:
+    // 1. Black background
+    // 2. color1 (baseColor) at 50% opacity
+    // 3. Black at 45% opacity on top
+    // The visual result of this blend is exactly: baseColor * 0.275 + Black * 0.725
+    val auroraBase = lerp(Color.Black, baseColor, 0.275f)
 
-private fun lightColorPalette(source: Hsl) = ColorPalette(
-    background0 = Color.hsl(
-        hue = source.hue,
-        saturation = source.saturation.coerceAtMost(0.1f),
-        lightness = 0.9f
-    ),
-    background1 = Color.hsl(
-        hue = source.hue,
-        saturation = source.saturation.coerceAtMost(0.3f),
-        lightness = 0.875f
-    ),
-    background2 = Color.hsl(
-        hue = source.hue,
-        saturation = source.saturation.coerceAtMost(0.4f),
-        lightness = 0.8f
-    ),
-    text = Color.hsl(
-        hue = source.hue,
-        saturation = source.saturation.coerceAtMost(0.02f),
-        lightness = 0.12f
-    ),
-    textSecondary = Color.hsl(
-        hue = source.hue,
-        saturation = source.saturation.coerceAtMost(0.1f),
-        lightness = 0.40f
-    ),
-    textDisabled = Color.hsl(
-        hue = source.hue,
-        saturation = source.saturation.coerceAtMost(0.2f),
-        lightness = 0.65f
-    ),
-    accent = Color.hsl(
-        hue = source.hue,
-        saturation = (source.saturation + 0.1f).coerceIn(0.45f, 0.7f),
-        lightness = 0.35f
-    ),
-    onAccent = Color.White,
-    isDefault = false,
-    isDark = false
-)
+    // We use this exact matched color for the UI backgrounds so it blends invisibly
+    val bg0 = lerp(Color.Black, baseColor, 0.15f)   // Slightly darker for deep background
+    val bg1 = auroraBase                            // Exact match for sheets and cards
+    val bg2 = lerp(Color.Black, baseColor, 0.35f)   // Slightly lighter for raised elements
 
-private fun darkColorPalette(source: Hsl, darkness: Darkness) = ColorPalette(
-    background0 = if (darkness == Darkness.Normal) Color.hsl(
-        hue = source.hue,
-        saturation = source.saturation.coerceAtMost(0.1f),
-        lightness = 0.08f
-    ) else Color.Black,
-    background1 = if (darkness == Darkness.Normal) Color.hsl(
-        hue = source.hue,
-        saturation = source.saturation.coerceAtMost(0.3f),
-        lightness = 0.12f
-    ) else Color.Black,
-    background2 = if (darkness == Darkness.Normal) Color.hsl(
-        hue = source.hue,
-        saturation = source.saturation.coerceAtMost(0.4f),
-        lightness = 0.18f
-    ) else Color.Black,
-    text = Color.hsl(
-        hue = source.hue,
-        saturation = source.saturation.coerceAtMost(0.02f),
-        lightness = 0.88f
-    ),
-    textSecondary = Color.hsl(
-        hue = source.hue,
-        saturation = source.saturation.coerceAtMost(0.1f),
-        lightness = 0.65f
-    ),
-    textDisabled = Color.hsl(
-        hue = source.hue,
-        saturation = source.saturation.coerceAtMost(0.2f),
-        lightness = 0.40f
-    ),
-    accent = Color.hsl(
-        hue = source.hue,
-        saturation = (source.saturation + 0.05f).coerceIn(0.4f, 0.65f),
-        lightness = 0.5f
-    ),
-    onAccent = Color.White,
-    isDefault = false,
-    isDark = true
-)
+    // Accent logic: ensure it pops but keeps the exact hue from the Aurora blob
+    val hsl = FloatArray(3)
+    ColorUtils.colorToHSL(accentColor.toArgb(), hsl)
 
-fun accentColorOf(
-    source: ColorSource,
-    isDark: Boolean,
-    materialAccentColor: Color?,
-    sampleBitmap: Bitmap?
-): Hsl {
-    return when (source) {
-        ColorSource.Default -> defaultAccentColor
-        ColorSource.Dynamic -> sampleBitmap?.let { dynamicAccentColorOf(it) }
-            ?: defaultAccentColor
-        ColorSource.MaterialYou -> materialAccentColor?.hsl ?: defaultAccentColor
+    val finalAccent = if (hsl[1] < 0.1f) {
+        Color.White // Grayscale album -> White buttons
+    } else {
+        Color.hsl(
+            hue = hsl[0],
+            saturation = hsl[1].coerceAtLeast(0.5f),
+            lightness = hsl[2].coerceIn(0.6f, 0.8f)
+        )
     }
+
+    return ColorPalette(
+        background0 = bg0,
+        background1 = bg1,
+        background2 = bg2,
+        text = Color.White,
+        textSecondary = Color.White.copy(alpha = 0.7f),
+        textDisabled = Color.White.copy(alpha = 0.4f),
+        accent = finalAccent,
+        onAccent = Color.Black,
+        isDefault = false
+    )
 }
 
-fun dynamicAccentColorOf(bitmap: Bitmap): Hsl? {
-    val palette = Palette
-        .from(bitmap)
-        .maximumColorCount(16)
-        .generate()
+val defaultDarkPalette = darkColorPalette(defaultAccentColor, defaultAccentColor).copy(isDefault = true)
 
-    val dominantSwatch = palette.dominantSwatch
-    val dominantIsAcceptable = (dominantSwatch?.hsl?.get(1) ?: 0f) > 0.05f
+fun extractThemeColors(bitmap: Bitmap): Pair<Color, Color> {
+    // 100% IDENTICAL EXTRACTION TO AURORA BACKGROUND
+    val palette = Palette.from(bitmap).maximumColorCount(16).generate()
+    val swatches = palette.swatches.sortedByDescending { it.population }
 
-    if (dominantIsAcceptable) {
-        return dominantSwatch?.getHsl()?.hsl
-    }
+    // Aurora's 'color1' is literally the 0th index swatch
+    val color1 = swatches.getOrNull(0)?.rgb ?: palette.getDominantColor(Color.Black.toArgb())
 
-    val bestSwatch =
-        palette.vibrantSwatch
-            ?: palette.mutedSwatch
-            ?: palette.lightVibrantSwatch
-            ?: dominantSwatch
+    // Aurora's blobs ('color2', 'color3', 'color4')
+    val color2 = swatches.getOrNull(1)?.rgb ?: color1
+    val color3 = swatches.getOrNull(2)?.rgb ?: color2
+    val color4 = swatches.getOrNull(3)?.rgb ?: color3
 
-    return bestSwatch?.getHsl()?.hsl
+    // We use color1 for the UI backgrounds so it perfectly matches the Aurora wash
+    val baseColor = Color(color1)
+
+    // For the UI accent, we grab the most colorful blob out of the 3 used in the Aurora
+    val blobColors = listOf(color2, color3, color4)
+    val accentRgb = blobColors.maxByOrNull { rgb ->
+        val hsl = FloatArray(3)
+        ColorUtils.colorToHSL(rgb, hsl)
+        hsl[1] // Find the one with the highest saturation
+    } ?: color2
+
+    return baseColor to Color(accentRgb)
 }
 
 fun colorPaletteOf(
     source: ColorSource,
-    darkness: Darkness,
-    isDark: Boolean,
     materialAccentColor: Color?,
     sampleBitmap: Bitmap?
 ): ColorPalette {
-    val accentColor = accentColorOf(
-        source = source,
-        isDark = isDark,
-        materialAccentColor = materialAccentColor,
-        sampleBitmap = sampleBitmap
-    )
-
-    val palette = if (isDark) {
-        darkColorPalette(accentColor, darkness)
-    } else {
-        lightColorPalette(accentColor)
+    val (bgColor, accentColor) = when (source) {
+        ColorSource.Default -> defaultAccentColor to defaultAccentColor
+        ColorSource.Dynamic -> sampleBitmap?.let { extractThemeColors(it) }
+            ?: (defaultAccentColor to defaultAccentColor)
+        ColorSource.MaterialYou -> (materialAccentColor ?: defaultAccentColor) to (materialAccentColor ?: defaultAccentColor)
     }
+
+    val palette = darkColorPalette(bgColor, accentColor)
     return palette.copy(isDefault = accentColor == defaultAccentColor)
 }
 
-fun ColorPalette.amoled() = if (isDark) {
-    val (hue, saturation) = accent.hsl
-
-    copy(
-        background0 = Color.hsl(
-            hue = hue,
-            saturation = saturation.coerceAtMost(0.1f),
-            lightness = 0.10f
-        ),
-        background1 = Color.hsl(
-            hue = hue,
-            saturation = saturation.coerceAtMost(0.3f),
-            lightness = 0.15f
-        ),
-        background2 = Color.hsl(
-            hue = hue,
-            saturation = saturation.coerceAtMost(0.4f),
-            lightness = 0.2f
-        )
-    )
-} else this
-
-inline val ColorPalette.isPureBlack get() = background0 == Color.Black
-inline val ColorPalette.collapsedPlayerProgressBar
-    get() = if (isPureBlack) defaultDarkPalette.background0 else background2
+inline val ColorPalette.collapsedPlayerProgressBar get() = background2
 inline val ColorPalette.favoritesIcon get() = if (isDefault) red else accent
 inline val ColorPalette.shimmer get() = if (isDefault) Color(0xff838383) else accent
-inline val ColorPalette.surface get() = if (isPureBlack) Color(0xff272727) else background2
+inline val ColorPalette.surface get() = background2
 
 @Suppress("UnusedReceiverParameter")
 inline val ColorPalette.overlay get() = Color.Black.copy(alpha = 0.75f)

@@ -1,6 +1,5 @@
 package dev.jigen.zimusic.ui.screens.mood
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +21,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.valentinilk.shimmer.shimmer
+import dev.jigen.compose.persist.persist
+import dev.jigen.core.ui.Dimensions
+import dev.jigen.core.ui.LocalAppearance
+import dev.jigen.providers.innertube.Innertube
+import dev.jigen.providers.innertube.models.bodies.BrowseBody
+import dev.jigen.providers.innertube.requests.BrowseResult
+import dev.jigen.providers.innertube.requests.browse
 import dev.jigen.zimusic.LocalPlayerAwareWindowInsets
 import dev.jigen.zimusic.R
 import dev.jigen.zimusic.models.Mood
@@ -39,14 +46,6 @@ import dev.jigen.zimusic.ui.screens.playlistRoute
 import dev.jigen.zimusic.utils.center
 import dev.jigen.zimusic.utils.secondary
 import dev.jigen.zimusic.utils.semiBold
-import dev.jigen.compose.persist.persist
-import dev.jigen.core.ui.Dimensions
-import dev.jigen.core.ui.LocalAppearance
-import dev.jigen.providers.innertube.Innertube
-import dev.jigen.providers.innertube.models.bodies.BrowseBody
-import dev.jigen.providers.innertube.requests.BrowseResult
-import dev.jigen.providers.innertube.requests.browse
-import com.valentinilk.shimmer.shimmer
 
 private const val DEFAULT_BROWSE_ID = "FEmusic_moods_and_genres_category"
 
@@ -55,7 +54,7 @@ fun MoodList(
     mood: Mood,
     modifier: Modifier = Modifier
 ) = Column(modifier = modifier) {
-    val (colorPalette, typography) = LocalAppearance.current
+    val (_, typography) = LocalAppearance.current
     val windowInsets = LocalPlayerAwareWindowInsets.current
 
     val browseId = mood.browseId ?: DEFAULT_BROWSE_ID
@@ -89,7 +88,6 @@ fun MoodList(
             state = lazyListState,
             contentPadding = contentPadding,
             modifier = Modifier
-                .background(colorPalette.background0)
                 .fillMaxSize()
         ) {
             item(

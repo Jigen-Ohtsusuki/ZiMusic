@@ -186,7 +186,6 @@ fun LocalPlaylistSongs(
                     .only(WindowInsetsSides.Vertical + WindowInsetsSides.End)
                     .asPaddingValues(),
                 modifier = Modifier
-                    .background(colorPalette.background0)
                     .fillMaxSize()
             ) {
                 item(
@@ -390,7 +389,6 @@ fun LocalPlaylistSongs(
                     Box(
                         modifier = Modifier
                             .draggedItem(reorderingState = reorderingState, index = index)
-                            .background(colorPalette.background0)
                     ) {
                         Box(
                             modifier = Modifier

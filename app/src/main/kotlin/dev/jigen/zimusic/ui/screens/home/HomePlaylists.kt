@@ -3,7 +3,6 @@ package dev.jigen.zimusic.ui.screens.home
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +28,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.jigen.compose.persist.persistList
+import dev.jigen.core.data.enums.BuiltInPlaylist
+import dev.jigen.core.data.enums.PlaylistSortBy
+import dev.jigen.core.data.enums.SortOrder
+import dev.jigen.core.ui.Dimensions
+import dev.jigen.core.ui.LocalAppearance
 import dev.jigen.zimusic.Database
 import dev.jigen.zimusic.LocalPlayerAwareWindowInsets
 import dev.jigen.zimusic.R
@@ -47,12 +52,6 @@ import dev.jigen.zimusic.ui.components.themed.VerticalDivider
 import dev.jigen.zimusic.ui.items.PlaylistItem
 import dev.jigen.zimusic.ui.screens.Route
 import dev.jigen.zimusic.ui.screens.builtinplaylist.BuiltInPlaylistScreen
-import dev.jigen.compose.persist.persistList
-import dev.jigen.core.data.enums.BuiltInPlaylist
-import dev.jigen.core.data.enums.PlaylistSortBy
-import dev.jigen.core.data.enums.SortOrder
-import dev.jigen.core.ui.Dimensions
-import dev.jigen.core.ui.LocalAppearance
 import kotlinx.collections.immutable.toImmutableList
 
 @Route
@@ -68,7 +67,7 @@ fun HomePlaylists(
 
     if (isCreatingANewPlaylist) TextFieldDialog(
         hintText = stringResource(R.string.enter_playlist_name_prompt),
-        onDismiss = { isCreatingANewPlaylist = false },
+        onDismiss = { },
         onAccept = { text ->
             query {
                 Database.instance.insert(Playlist(name = text))
@@ -108,13 +107,12 @@ fun HomePlaylists(
             else Arrangement.Top,
             modifier = Modifier
                 .fillMaxSize()
-                .background(colorPalette.background0)
         ) {
             item(key = "header", contentType = 0, span = { GridItemSpan(maxLineSpan) }) {
                 Header(title = stringResource(R.string.playlists)) {
                     SecondaryTextButton(
                         text = stringResource(R.string.new_playlist),
-                        onClick = { isCreatingANewPlaylist = true }
+                        onClick = { }
                     )
 
                     Spacer(modifier = Modifier.weight(1f))
@@ -156,8 +154,6 @@ fun HomePlaylists(
                     )
                 }
             }
-
-            // TODO: clean up (also in BuiltInPlaylistScreen): icon etc. could live in BuiltInPlaylist (cleans up duplicate code mess)
 
             if (BuiltInPlaylist.Favorites in builtInPlaylists) item(key = "favorites") {
                 PlaylistItem(

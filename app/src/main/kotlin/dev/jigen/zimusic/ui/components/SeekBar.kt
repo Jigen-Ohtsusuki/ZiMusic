@@ -4,9 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDp
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.expandVertically
@@ -14,7 +11,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -22,11 +18,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,35 +31,23 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.ContentDrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import dev.jigen.core.ui.LocalAppearance
-import dev.jigen.core.ui.utils.roundedShape
 import dev.jigen.zimusic.models.ui.UiMedia
 import dev.jigen.zimusic.preferences.PlayerPreferences
 import dev.jigen.zimusic.service.PlayerService
 import dev.jigen.zimusic.utils.formatAsDuration
 import dev.jigen.zimusic.utils.semiBold
 import kotlinx.coroutines.launch
-import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.roundToLong
-import kotlin.math.sin
 
 @Composable
 fun SeekBar(
@@ -75,41 +56,28 @@ fun SeekBar(
     media: UiMedia,
     modifier: Modifier = Modifier,
     color: Color = LocalAppearance.current.colorPalette.text,
-    backgroundColor: Color = LocalAppearance.current.colorPalette.background2,
-    shape: Shape = 8.dp.roundedShape,
-    isActive: Boolean = binder.player.isPlaying,
-    alwaysShowDuration: Boolean = false,
-    scrubberRadius: Dp = 6.dp,
-    style: PlayerPreferences.SeekBarStyle = PlayerPreferences.seekBarStyle,
-    range: ClosedRange<Long> = 0L..media.duration
+    alwaysShowDuration: Boolean = false
 ) {
     var scrubbingPosition by remember(media) { mutableStateOf<Long?>(null) }
-
-    // Tracks when the user last let go of the bar (drag or tap)
     var lastInteractionTime by remember { mutableLongStateOf(0L) }
 
     val animatedPosition = remember { Animatable(position.toFloat()) }
     val scope = rememberCoroutineScope()
+    val duration = media.duration
+    val range = 0L..duration
 
     LaunchedEffect(position, scrubbingPosition) {
-        // 1. If dragging, snap immediately to finger
         if (scrubbingPosition != null) {
             animatedPosition.snapTo(scrubbingPosition!!.toFloat())
             return@LaunchedEffect
         }
 
-        // 2. Interaction Lock: Ignore player updates for 350ms after a drag/tap
-        // This prevents the bar from jumping back to the old time before the seek completes
-        val timeSinceInteraction = System.currentTimeMillis() - lastInteractionTime
-        if (timeSinceInteraction < 350L) {
+        if (System.currentTimeMillis() - lastInteractionTime < 350L) {
             return@LaunchedEffect
         }
 
-        // 3. Normal Playback: Snap if jump is huge (bg resume), else animate smooth
         val target = position.toFloat()
-        val current = animatedPosition.value
-
-        if (abs(target - current) > 2000) {
+        if (abs(target - animatedPosition.value) > 2000) {
             animatedPosition.snapTo(target)
         } else {
             animatedPosition.animateTo(
@@ -121,10 +89,9 @@ fun SeekBar(
 
     var isDragging by remember { mutableStateOf(false) }
 
-    // -- Drag Logic --
     val onSeekStart: (Long) -> Unit = { scrubbingPosition = it }
     val onSeek: (Long) -> Unit = { delta ->
-        scrubbingPosition = if (media.duration == C.TIME_UNSET) null
+        scrubbingPosition = if (duration == C.TIME_UNSET) null
         else scrubbingPosition?.let { (it + delta).coerceIn(range) }
     }
     val onSeekEnd = {
@@ -133,320 +100,86 @@ fun SeekBar(
         lastInteractionTime = System.currentTimeMillis()
     }
 
-    // -- Tap Logic --
     val onTap: (Long) -> Unit = { time ->
-        // Lock the periodic updates so our custom animation isn't interrupted
         lastInteractionTime = System.currentTimeMillis()
-
-        // 1. Very quickly animate the visual scrubber to the tap point (150ms)
         scope.launch {
             animatedPosition.animateTo(
                 targetValue = time.toFloat(),
                 animationSpec = tween(durationMillis = 150, easing = LinearEasing)
             )
         }
-
-        // 2. Actually seek the player
         binder.player.seekTo(time)
     }
 
-    val innerModifier = modifier
-        .pointerInput(range) {
-            if (range.endInclusive < range.start) return@pointerInput
-
-            detectDrags(
-                setIsDragging = { isDragging = it },
-                range = range,
-                onSeekStart = onSeekStart,
-                onSeek = onSeek,
-                onSeekEnd = onSeekEnd
-            )
-        }
-        .pointerInput(range) {
-            detectTaps(
-                range = range,
-                onTap = onTap
-            )
-        }
-
-    when (style) {
-        PlayerPreferences.SeekBarStyle.Static -> {
-            ClassicSeekBarBody(
-                position = scrubbingPosition ?: animatedPosition.value.toLong(),
-                duration = media.duration,
-                poiTimestamp = binder.poiTimestamp,
-                isDragging = isDragging,
-                color = color,
-                backgroundColor = backgroundColor,
-                showDuration = alwaysShowDuration || scrubbingPosition != null,
-                modifier = innerModifier,
-                scrubberRadius = scrubberRadius,
-                shape = shape
-            )
-        }
-
-        PlayerPreferences.SeekBarStyle.Wavy -> {
-            WavySeekBarBody(
-                position = scrubbingPosition ?: animatedPosition.value.toLong(),
-                duration = media.duration,
-                poiTimestamp = binder.poiTimestamp,
-                isDragging = isDragging,
-                color = color,
-                backgroundColor = backgroundColor,
-                modifier = innerModifier,
-                scrubberRadius = scrubberRadius,
-                shape = shape,
-                showDuration = alwaysShowDuration || scrubbingPosition != null,
-                isActive = isActive
-            )
-        }
-
-        PlayerPreferences.SeekBarStyle.Dotted -> {
-            DottedSeekBarBody(
-                position = scrubbingPosition ?: animatedPosition.value.toLong(),
-                duration = media.duration,
-                isDragging = isDragging,
-                color = color,
-                showDuration = alwaysShowDuration || scrubbingPosition != null,
-                modifier = innerModifier
-            )
-        }
-    }
-}
-
-@Composable
-private fun DottedSeekBarBody(
-    position: Long,
-    duration: Long,
-    isDragging: Boolean,
-    color: Color,
-    showDuration: Boolean,
-    modifier: Modifier = Modifier,
-    dotCount: Int = 36
-) {
-    val transition = updateTransition(targetState = isDragging, label = "isDragging")
-    val barHeight by transition.animateDp(label = "barHeight") { if (it) 24.dp else 16.dp }
+    val transition = updateTransition(targetState = isDragging, label = "")
+    val trackHeight by transition.animateDp(label = "") { if (it) 12.dp else 6.dp }
 
     Column(modifier = modifier) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(24.dp)
-        ) {
-            if (duration == 0L) return@Canvas
-
-            val canvasWidth = size.width
-            val canvasHeight = size.height
-            val barHeightPx = barHeight.toPx()
-
-            val dotRadius = 2.5.dp.toPx()
-            val spacing = (canvasWidth - (dotCount * 2 * dotRadius)) / (dotCount - 1)
-            val progress = (position.toFloat() / duration).coerceIn(0f, 1f)
-            val progressWidth = canvasWidth * progress
-
-            for (i in 0 until dotCount) {
-                val dotCenterX = i * (2 * dotRadius + spacing) + dotRadius
-                drawCircle(
-                    color = color.copy(alpha = 0.3f),
-                    radius = dotRadius,
-                    center = Offset(dotCenterX, canvasHeight / 2)
-                )
-            }
-
-            drawRoundRect(
-                color = color, // Changed from Color.White to color
-                topLeft = Offset(x = 0f, y = (canvasHeight - barHeightPx) / 2),
-                size = Size(width = progressWidth, height = barHeightPx),
-                cornerRadius = CornerRadius(barHeightPx / 2)
-            )
-        }
-
-        Duration(
-            position = position,
-            duration = duration,
-            show = showDuration
-        )
-    }
-}
-
-
-@Composable
-private fun ClassicSeekBarBody(
-    position: Long,
-    duration: Long,
-    poiTimestamp: Long?,
-    isDragging: Boolean,
-    color: Color,
-    backgroundColor: Color,
-    scrubberRadius: Dp,
-    shape: Shape,
-    showDuration: Boolean,
-    modifier: Modifier = Modifier,
-    range: ClosedRange<Long> = 0L..duration,
-    barHeight: Dp = 3.dp,
-    scrubberColor: Color = color,
-    drawSteps: Boolean = false
-) = Column {
-    val transition = updateTransition(
-        targetState = isDragging,
-        label = null
-    )
-
-    val currentBarHeight by transition.animateDp(label = "") { if (it) scrubberRadius else barHeight }
-    val currentScrubberRadius by transition.animateDp(label = "") { if (it) 0.dp else scrubberRadius }
-
-    Box(
-        modifier = modifier
-            .padding(horizontal = scrubberRadius)
-            .drawWithContent {
-                drawContent()
-
-                val scrubberPosition =
-                    if (range.endInclusive < range.start) 0f
-                    else (position.toFloat() - range.start) / (range.endInclusive - range.start) * size.width
-
-                drawCircle(
-                    color = scrubberColor,
-                    radius = currentScrubberRadius.toPx(),
-                    center = center.copy(x = scrubberPosition)
-                )
-
-                if (poiTimestamp != null && position < poiTimestamp) drawPoi(
-                    range = range,
-                    position = poiTimestamp,
-                    color = color
-                )
-
-                if (drawSteps) for (i in position + 1..range.endInclusive) {
-                    val stepPosition =
-                        (i.toFloat() - range.start) / (range.endInclusive - range.start) * size.width
-
-                    drawCircle(
-                        color = scrubberColor,
-                        radius = scrubberRadius.toPx() / 2,
-                        center = center.copy(x = stepPosition)
-                    )
-                }
-            }
-            .height(scrubberRadius)
-    ) {
-        Spacer(
-            modifier = Modifier
-                .height(currentBarHeight)
-                .fillMaxWidth()
-                .background(color = backgroundColor, shape = shape)
-                .align(Alignment.Center)
-        )
-
-        Spacer(
-            modifier = Modifier
-                .height(currentBarHeight)
-                .fillMaxWidth((position.toFloat() - range.start) / (range.endInclusive - range.start).toFloat())
-                .background(color = color, shape = shape)
-                .align(Alignment.CenterStart)
-        )
-    }
-
-    Duration(
-        position = position,
-        duration = duration,
-        show = showDuration
-    )
-}
-
-@Composable
-private fun WavySeekBarBody(
-    position: Long,
-    duration: Long,
-    poiTimestamp: Long?,
-    isDragging: Boolean,
-    color: Color,
-    backgroundColor: Color,
-    shape: Shape,
-    showDuration: Boolean,
-    modifier: Modifier = Modifier,
-    range: ClosedRange<Long> = 0L..duration,
-    isActive: Boolean = true,
-    scrubberRadius: Dp = 6.dp
-) = Column {
-    val transition = updateTransition(
-        targetState = isDragging,
-        label = null
-    )
-
-    val currentAmplitude by transition.animateDp(label = "") { if (it || !isActive) 0.dp else 2.dp }
-    val currentScrubberHeight by transition.animateDp(label = "") { if (it) 20.dp else 15.dp }
-
-    val fraction = (position - range.start) / (range.endInclusive - range.start).toFloat()
-    val progress by rememberInfiniteTransition(label = "").animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(2000, easing = LinearEasing)),
-        label = ""
-    )
-
-    Box(
-        modifier = modifier
-            .padding(horizontal = scrubberRadius)
-            .drawWithContent {
-                drawContent()
-
-                if (poiTimestamp != null && position <= poiTimestamp) drawPoi(
-                    range = range,
-                    position = poiTimestamp,
-                    color = color
-                )
-
-                drawScrubber(
-                    range = range,
-                    position = position,
-                    color = color,
-                    height = currentScrubberHeight
-                )
-            }
-    ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(6.dp)
-        ) {
-            Spacer(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(1f - fraction)
-                    .background(
-                        color = backgroundColor,
-                        shape = shape
+                .height(32.dp)
+                .pointerInput(range) {
+                    if (range.endInclusive < range.start) return@pointerInput
+                    detectDrags(
+                        setIsDragging = { },
+                        range = range,
+                        onSeekStart = onSeekStart,
+                        onSeek = onSeek,
+                        onSeekEnd = onSeekEnd
                     )
-                    .align(Alignment.CenterEnd)
-            )
-
+                }
+                .pointerInput(range) {
+                    detectTaps(
+                        range = range,
+                        onTap = onTap
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
             Canvas(
                 modifier = Modifier
-                    .fillMaxWidth(fraction)
-                    .height(currentAmplitude)
-                    .align(Alignment.CenterStart)
+                    .fillMaxWidth()
+                    .height(32.dp)
             ) {
-                drawPath(
-                    path = wavePath(
-                        size = size,
-                        progress = progress
-                    ),
-                    color = color,
-                    style = Stroke(
-                        width = 3.dp.toPx(),
+                val canvasWidth = size.width
+                val canvasHeight = size.height
+                val barHeightPx = trackHeight.toPx()
+
+                val startX = barHeightPx / 2f
+                val endX = canvasWidth - barHeightPx / 2f
+                val length = endX - startX
+
+                val currentPos = scrubbingPosition ?: animatedPosition.value.toLong()
+                val progress = if (duration > 0) (currentPos.toFloat() / duration).coerceIn(0f, 1f) else 0f
+
+                drawLine(
+                    color = color.copy(alpha = 0.25f),
+                    start = Offset(startX, canvasHeight / 2),
+                    end = Offset(endX, canvasHeight / 2),
+                    strokeWidth = barHeightPx,
+                    cap = StrokeCap.Round
+                )
+
+                if (length > 0 && progress > 0) {
+                    val pX = startX + (length * progress)
+                    drawLine(
+                        color = color,
+                        start = Offset(startX, canvasHeight / 2),
+                        end = Offset(pX, canvasHeight / 2),
+                        strokeWidth = barHeightPx,
                         cap = StrokeCap.Round
                     )
-                )
+                }
             }
         }
-    }
 
-    Duration(
-        position = position,
-        duration = duration,
-        show = showDuration
-    )
+        Duration(
+            position = scrubbingPosition ?: animatedPosition.value.toLong(),
+            duration = duration,
+            show = alwaysShowDuration || scrubbingPosition != null
+        )
+    }
 }
 
 private suspend fun PointerInputScope.detectDrags(
@@ -497,50 +230,6 @@ private suspend fun PointerInputScope.detectTaps(
     )
 }
 
-private fun ContentDrawScope.drawScrubber(
-    range: ClosedRange<Long>,
-    position: Long,
-    color: Color,
-    height: Dp
-) {
-    val scrubberPosition = if (range.endInclusive < range.start) 0f
-    else (position - range.start) / (range.endInclusive - range.start).toFloat() * size.width
-
-    val widthPx = 5.dp.toPx()
-    val heightPx = height.toPx()
-
-    drawRoundRect(
-        color = color,
-        topLeft = Offset(
-            x = scrubberPosition - widthPx / 2,
-            y = (size.height - heightPx) / 2f
-        ),
-        size = Size(
-            width = widthPx,
-            height = heightPx
-        ),
-        cornerRadius = CornerRadius(widthPx / 2)
-    )
-}
-
-private fun ContentDrawScope.drawPoi(
-    range: ClosedRange<Long>,
-    position: Long,
-    color: Color,
-    width: Dp = 4.dp
-) {
-    val poiPosition = if (range.endInclusive < range.start) 0f
-    else (position - range.start) / (range.endInclusive - range.start).toFloat() * size.width
-
-    val widthPx = width.toPx()
-    drawRoundRect(
-        color = color,
-        topLeft = Offset(x = poiPosition - widthPx / 2, y = 0f),
-        size = Size(width = widthPx, height = size.height),
-        cornerRadius = CornerRadius((width / 2).toPx())
-    )
-}
-
 @Composable
 private fun Duration(
     position: Long,
@@ -554,7 +243,6 @@ private fun Duration(
     val typography = LocalAppearance.current.typography
 
     Column {
-        Spacer(Modifier.height(8.dp))
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
@@ -579,25 +267,4 @@ private fun Duration(
             )
         }
     }
-}
-
-private fun Density.wavePath(
-    size: Size,
-    progress: Float,
-    quality: Float = PlayerPreferences.wavySeekBarQuality.quality
-) = Path().apply {
-    val (width, height) = size
-    val progressTau = progress * 2 * PI.toFloat()
-    val scale = 7.dp.toPx()
-
-    fun f(x: Float) = (sin(x / scale + progressTau) + 0.5f) * height
-
-    moveTo(0f, f(0f))
-
-    var x = 0f
-    while (x < width) {
-        lineTo(x, f(x))
-        x += quality
-    }
-    lineTo(width, f(width))
 }

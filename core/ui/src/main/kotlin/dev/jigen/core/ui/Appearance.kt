@@ -3,12 +3,10 @@ package dev.jigen.core.ui
 import android.app.Activity
 import android.graphics.Bitmap
 import android.os.Parcelable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -41,39 +39,27 @@ val LocalAppearance = staticCompositionLocalOf<Appearance> { error("No appearanc
 @Composable
 inline fun rememberAppearance(
     vararg keys: Any = arrayOf(Unit),
-    isDark: Boolean = isSystemInDarkTheme(),
-    crossinline provide: (isSystemInDarkTheme: Boolean) -> Appearance
-) = rememberSaveable(keys, isCompositionLaunched(), isDark) {
-    mutableStateOf(provide(isDark))
+    crossinline provide: () -> Appearance
+) = rememberSaveable(keys, isCompositionLaunched()) {
+    mutableStateOf(provide())
 }
 
 @Composable
 fun appearance(
     source: ColorSource,
-    mode: ColorMode,
-    darkness: Darkness,
     materialAccentColor: Color?,
     sampleBitmap: Bitmap?,
     fontFamily: BuiltInFontFamily,
     applyFontPadding: Boolean,
-    thumbnailRoundness: Dp,
-    isSystemInDarkTheme: Boolean = isSystemInDarkTheme()
+    thumbnailRoundness: Dp
 ): Appearance {
-    val isDark = remember(mode, isSystemInDarkTheme) {
-        mode == ColorMode.Dark || (mode == ColorMode.System && isSystemInDarkTheme)
-    }
-
     val colorPalette = rememberSaveable(
         source,
-        darkness,
-        isDark,
         materialAccentColor,
         sampleBitmap
     ) {
         colorPaletteOf(
             source = source,
-            darkness = darkness,
-            isDark = isDark,
             materialAccentColor = materialAccentColor,
             sampleBitmap = sampleBitmap
         )
@@ -83,8 +69,7 @@ fun appearance(
         colorPalette,
         fontFamily,
         applyFontPadding,
-        thumbnailRoundness,
-        isDark = isDark
+        thumbnailRoundness
     ) {
         Appearance(
             colorPalette = colorPalette,
@@ -98,15 +83,14 @@ fun appearance(
     }.value
 }
 
-fun Activity.setSystemBarAppearance(isDark: Boolean) {
+fun Activity.setSystemBarAppearance() {
     with(WindowCompat.getInsetsController(window, window.decorView.rootView)) {
-        isAppearanceLightStatusBars = !isDark
-        isAppearanceLightNavigationBars = !isDark
+        isAppearanceLightStatusBars = false
+        isAppearanceLightNavigationBars = false
     }
 
-    val color = (if (isDark) Color.Transparent else Color.Black.copy(alpha = 0.2f)).toArgb()
+    val color = Color.Transparent.toArgb()
 
-    // TODO: Android now expects a background behind the system bars as well
     @Suppress("DEPRECATION")
     if (!isAtLeastAndroid6) window.statusBarColor = color
     @Suppress("DEPRECATION")
@@ -116,6 +100,6 @@ fun Activity.setSystemBarAppearance(isDark: Boolean) {
 @Composable
 fun Activity.SystemBarAppearance(palette: ColorPalette) = LaunchedEffect(palette) {
     withContext(Dispatchers.Main) {
-        setSystemBarAppearance(palette.isDark)
+        setSystemBarAppearance()
     }
 }

@@ -2,7 +2,6 @@ package dev.jigen.zimusic.ui.screens.home
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
@@ -37,6 +36,14 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.jigen.compose.persist.persist
+import dev.jigen.core.ui.Dimensions
+import dev.jigen.core.ui.LocalAppearance
+import dev.jigen.core.ui.utils.isLandscape
+import dev.jigen.providers.innertube.Innertube
+import dev.jigen.providers.innertube.models.NavigationEndpoint
+import dev.jigen.providers.innertube.models.bodies.NextBody
+import dev.jigen.providers.innertube.requests.relatedPage
 import dev.jigen.zimusic.Database
 import dev.jigen.zimusic.LocalPlayerAwareWindowInsets
 import dev.jigen.zimusic.LocalPlayerServiceBinder
@@ -66,14 +73,6 @@ import dev.jigen.zimusic.utils.playingSong
 import dev.jigen.zimusic.utils.rememberSnapLayoutInfo
 import dev.jigen.zimusic.utils.secondary
 import dev.jigen.zimusic.utils.semiBold
-import dev.jigen.compose.persist.persist
-import dev.jigen.core.ui.Dimensions
-import dev.jigen.core.ui.LocalAppearance
-import dev.jigen.core.ui.utils.isLandscape
-import dev.jigen.providers.innertube.Innertube
-import dev.jigen.providers.innertube.models.NavigationEndpoint
-import dev.jigen.providers.innertube.models.bodies.NextBody
-import dev.jigen.providers.innertube.requests.relatedPage
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -160,7 +159,6 @@ fun QuickPicks(
 
         Column(
             modifier = Modifier
-                .background(colorPalette.background0)
                 .fillMaxSize()
                 .verticalScroll(scrollState)
                 .padding(

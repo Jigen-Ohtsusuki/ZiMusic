@@ -3,7 +3,6 @@ package dev.jigen.zimusic.ui.screens.settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -19,9 +18,7 @@ import dev.jigen.zimusic.utils.currentLocale
 import dev.jigen.zimusic.utils.findActivity
 import dev.jigen.zimusic.utils.startLanguagePicker
 import dev.jigen.core.ui.BuiltInFontFamily
-import dev.jigen.core.ui.ColorMode
 import dev.jigen.core.ui.ColorSource
-import dev.jigen.core.ui.Darkness
 import dev.jigen.core.ui.LocalAppearance
 import dev.jigen.core.ui.ThumbnailRoundness
 import dev.jigen.core.ui.googleFontsAvailable
@@ -32,7 +29,6 @@ import dev.jigen.core.ui.utils.isAtLeastAndroid13
 fun AppearanceSettings() = with(AppearancePreferences) {
     val (colorPalette) = LocalAppearance.current
     val context = LocalContext.current
-    val isDark = isSystemInDarkTheme()
 
     SettingsCategoryScreen(title = stringResource(R.string.appearance)) {
         SettingsGroup(title = stringResource(R.string.colors)) {
@@ -42,20 +38,6 @@ fun AppearanceSettings() = with(AppearancePreferences) {
                 onValueSelect = { colorSource = it },
                 valueText = { it.nameLocalized }
             )
-            EnumValueSelectorSettingsEntry(
-                title = stringResource(R.string.color_mode),
-                selectedValue = colorMode,
-                onValueSelect = { colorMode = it },
-                valueText = { it.nameLocalized }
-            )
-            AnimatedVisibility(visible = colorMode == ColorMode.Dark || (colorMode == ColorMode.System && isDark)) {
-                EnumValueSelectorSettingsEntry(
-                    title = stringResource(R.string.darkness),
-                    selectedValue = darkness,
-                    onValueSelect = { darkness = it },
-                    valueText = { it.nameLocalized }
-                )
-            }
         }
         SettingsGroup(title = stringResource(R.string.shapes)) {
             EnumValueSelectorSettingsEntry(
@@ -135,24 +117,7 @@ fun AppearanceSettings() = with(AppearancePreferences) {
                 isChecked = PlayerPreferences.horizontalSwipeToClose,
                 onCheckedChange = { PlayerPreferences.horizontalSwipeToClose = it }
             )
-            EnumValueSelectorSettingsEntry(
-                title = stringResource(R.string.player_layout),
-                selectedValue = PlayerPreferences.playerLayout,
-                onValueSelect = { PlayerPreferences.playerLayout = it },
-                valueText = { it.displayName() }
-            )
 
-            AnimatedVisibility(
-                visible = PlayerPreferences.playerLayout == PlayerPreferences.PlayerLayout.New,
-                label = ""
-            ) {
-                SwitchSettingsEntry(
-                    title = stringResource(R.string.show_like_button),
-                    text = stringResource(R.string.show_like_button_description),
-                    isChecked = PlayerPreferences.showLike,
-                    onCheckedChange = { PlayerPreferences.showLike = it }
-                )
-            }
             EnumValueSelectorSettingsEntry(
                 title = stringResource(R.string.seek_bar_style),
                 selectedValue = PlayerPreferences.seekBarStyle,
@@ -234,24 +199,6 @@ val ColorSource.nameLocalized
             ColorSource.Default -> R.string.color_source_default
             ColorSource.Dynamic -> R.string.color_source_dynamic
             ColorSource.MaterialYou -> R.string.color_source_material_you
-        }
-    )
-
-val ColorMode.nameLocalized
-    @Composable get() = stringResource(
-        when (this) {
-            ColorMode.System -> R.string.color_mode_system
-            ColorMode.Light -> R.string.color_mode_light
-            ColorMode.Dark -> R.string.color_mode_dark
-        }
-    )
-
-val Darkness.nameLocalized
-    @Composable get() = stringResource(
-        when (this) {
-            Darkness.Normal -> R.string.darkness_normal
-            Darkness.AMOLED -> R.string.darkness_amoled
-            Darkness.PureBlack -> R.string.darkness_pureblack
         }
     )
 

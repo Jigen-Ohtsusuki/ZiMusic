@@ -1,25 +1,38 @@
 package dev.jigen.zimusic.ui.screens.player
 
+import android.annotation.SuppressLint
 import android.app.SearchManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Bitmap
-import android.net.Uri
-import android.os.Build
 import android.util.Log
-import androidx.annotation.RequiresApi
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -30,9 +43,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ripple
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -41,12 +64,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.media3.common.C
 import androidx.media3.common.MediaMetadata
 import coil3.imageLoader
@@ -57,7 +80,6 @@ import com.valentinilk.shimmer.shimmer
 import dev.jigen.core.ui.LocalAppearance
 import dev.jigen.core.ui.onOverlay
 import dev.jigen.core.ui.onOverlayShimmer
-import dev.jigen.core.ui.utils.dp
 import dev.jigen.core.ui.utils.roundedShape
 import dev.jigen.providers.innertube.Innertube
 import dev.jigen.providers.innertube.models.bodies.NextBody
@@ -80,14 +102,41 @@ import dev.jigen.zimusic.query
 import dev.jigen.zimusic.service.LOCAL_KEY_PREFIX
 import dev.jigen.zimusic.transaction
 import dev.jigen.zimusic.ui.components.LocalMenuState
-import dev.jigen.zimusic.ui.components.themed.*
+import dev.jigen.zimusic.ui.components.themed.CircularProgressIndicator
+import dev.jigen.zimusic.ui.components.themed.DefaultDialog
+import dev.jigen.zimusic.ui.components.themed.Menu
+import dev.jigen.zimusic.ui.components.themed.MenuEntry
+import dev.jigen.zimusic.ui.components.themed.SecondaryTextButton
+import dev.jigen.zimusic.ui.components.themed.TextField
+import dev.jigen.zimusic.ui.components.themed.TextFieldDialog
+import dev.jigen.zimusic.ui.components.themed.TextPlaceholder
+import dev.jigen.zimusic.ui.components.themed.ValueSelectorDialogBody
 import dev.jigen.zimusic.ui.modifiers.verticalFadingEdge
-import dev.jigen.zimusic.utils.*
+import dev.jigen.zimusic.utils.LyricsCacheManager
+import dev.jigen.zimusic.utils.ShareCard
+import dev.jigen.zimusic.utils.SynchronizedLyrics
+import dev.jigen.zimusic.utils.SynchronizedLyricsState
+import dev.jigen.zimusic.utils.bold
+import dev.jigen.zimusic.utils.captureComposableAsBitmap
+import dev.jigen.zimusic.utils.center
+import dev.jigen.zimusic.utils.color
+import dev.jigen.zimusic.utils.saveBitmapToCache
+import dev.jigen.zimusic.utils.saveBitmapToGallery
+import dev.jigen.zimusic.utils.semiBold
+import dev.jigen.zimusic.utils.shareImageUri
+import dev.jigen.zimusic.utils.toast
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.cancellable
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
@@ -133,7 +182,7 @@ private fun getCachedWordLevelLyrics(context: android.content.Context, mediaId: 
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.P)
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun Lyrics(
     mediaId: String,
@@ -162,7 +211,6 @@ fun Lyrics(
     val context = LocalContext.current
     val menuState = LocalMenuState.current
     val binder = LocalPlayerServiceBinder.current
-    val density = LocalDensity.current
     val view = LocalView.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -360,10 +408,9 @@ fun Lyrics(
 
                                 if (hasActualWords) {
                                     wordSyncedAvailable = true
-                                    val nonNullWordLevelLyrics = wordLevelLyrics
 
                                     val jsonString = try {
-                                        Json.encodeToString(nonNullWordLevelLyrics)
+                                        Json.encodeToString(wordLevelLyrics)
                                     } catch (e: Exception) {
                                         e.printStackTrace()
                                         null
@@ -387,7 +434,7 @@ fun Lyrics(
                                         }
 
                                         val manager = LyricsPlusSyncManager(
-                                            lyrics = nonNullWordLevelLyrics,
+                                            lyrics = wordLevelLyrics,
                                             positionProvider = { binder?.player?.currentPosition ?: 0L }
                                         )
                                         wordSyncCache[mediaId] = manager
@@ -480,7 +527,7 @@ fun Lyrics(
         singleLine = false,
         maxLines = 10,
         isTextInputValid = { true },
-        onDismiss = { editing = false },
+        onDismiss = { },
         onAccept = {
             transaction {
                 runCatching {
@@ -516,8 +563,8 @@ fun Lyrics(
 
         LrcLibSearchDialog(
             query = query,
-            setQuery = { query = it },
-            onDismiss = { picking = false },
+            setQuery = { },
+            onDismiss = { },
             onPick = {
                 runCatching {
                     transaction {
@@ -542,10 +589,6 @@ fun Lyrics(
             }
             .background(Color.Transparent)
     ) {
-        val animatedHeight by animateDpAsState(
-            targetValue = this.maxHeight,
-            label = ""
-        )
 
         AnimatedVisibility(
             visible = error,
@@ -728,8 +771,8 @@ fun Lyrics(
                                 label = "lineSelectionBackgroundColor"
                             )
 
-                            val activeColor = if (colorPalette.isDark) Color.White else Color.Black
-                            val inactiveColor = if (colorPalette.isDark) colorPalette.textDisabled else Color.Gray
+                            val activeColor = Color.White
+                            val inactiveColor = colorPalette.textDisabled
 
                             val color by animateColorAsState(
                                 if (index == synchronizedLyrics.index && !isSelectingForShare) activeColor
@@ -768,22 +811,11 @@ fun Lyrics(
                                         }
                                     )
                             ) {
-                                if (sentence.isBlank()) {
-                                    Image(
-                                        painter = painterResource(R.drawable.musical_notes),
-                                        contentDescription = null,
-                                        colorFilter = ColorFilter.tint(color),
-                                        modifier = Modifier
-                                            .padding(vertical = 8.dp, horizontal = 16.dp)
-                                            .size(typography.l.fontSize.dp)
-                                    )
-                                } else {
-                                    BasicText(
-                                        text = sentence,
-                                        style = typography.l.center.bold.color(color),
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)
-                                    )
-                                }
+                                BasicText(
+                                    text = sentence.ifBlank { "•••" },
+                                    style = typography.l.center.bold.color(color),
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)
+                                )
                             }
                         }
 
@@ -802,7 +834,7 @@ fun Lyrics(
 
                     BasicText(
                         text = displayText,
-                        style = typography.l.center.bold.color(if (colorPalette.isDark) Color.White else Color.Black),
+                        style = typography.l.center.bold.color(Color.White),
                         modifier = Modifier
                             .verticalFadingEdge()
                             .verticalScroll(rememberScrollState())
@@ -836,7 +868,7 @@ fun Lyrics(
                 Image(
                     painter = painterResource(R.drawable.ellipsis_horizontal),
                     contentDescription = null,
-                    colorFilter = ColorFilter.tint(if (colorPalette.isDark) colorPalette.onOverlay else Color.Black),
+                    colorFilter = ColorFilter.tint(colorPalette.onOverlay),
                     modifier = Modifier
                         .clickable(
                             indication = ripple(bounded = false),
@@ -876,7 +908,6 @@ fun Lyrics(
                                             text = stringResource(R.string.edit_lyrics),
                                             onClick = {
                                                 menuState.hide()
-                                                editing = true
                                             }
                                         )
 
@@ -942,7 +973,6 @@ fun Lyrics(
                                                 text = stringResource(R.string.pick_from_lrclib),
                                                 onClick = {
                                                     menuState.hide()
-                                                    picking = true
                                                 }
                                             )
                                             MenuEntry(
@@ -978,7 +1008,7 @@ fun Lyrics(
                 Image(
                     painter = painterResource(R.drawable.close),
                     contentDescription = null,
-                    colorFilter = ColorFilter.tint(if (colorPalette.isDark) colorPalette.onOverlay else Color.Black),
+                    colorFilter = ColorFilter.tint(colorPalette.onOverlay),
                     modifier = Modifier
                         .clickable(
                             indication = ripple(bounded = false),
@@ -1021,7 +1051,7 @@ fun Lyrics(
                         val highQualityArtworkUri = artworkUri?.let {
                             val originalUrl = it.toString()
                             if (originalUrl.contains("=w")) {
-                                Uri.parse(originalUrl.replace(Regex("=w\\d+-h\\d+"), "=w1080-h1080"))
+                                originalUrl.replace(Regex("=w\\d+-h\\d+"), "=w1080-h1080").toUri()
                             } else it
                         }
 

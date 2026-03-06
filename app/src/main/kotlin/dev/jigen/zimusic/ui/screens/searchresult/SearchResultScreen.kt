@@ -4,10 +4,10 @@ package dev.jigen.zimusic.ui.screens.searchresult
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
@@ -18,7 +18,7 @@ import androidx.compose.material.rememberSwipeableState
 import androidx.compose.material.swipeable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
@@ -45,14 +45,25 @@ import dev.jigen.zimusic.ui.components.LocalMenuState
 import dev.jigen.zimusic.ui.components.themed.Header
 import dev.jigen.zimusic.ui.components.themed.NonQueuedMediaItemMenu
 import dev.jigen.zimusic.ui.components.themed.Scaffold
-import dev.jigen.zimusic.ui.items.*
-import dev.jigen.zimusic.ui.screens.*
+import dev.jigen.zimusic.ui.items.AlbumItem
+import dev.jigen.zimusic.ui.items.AlbumItemPlaceholder
+import dev.jigen.zimusic.ui.items.ArtistItem
+import dev.jigen.zimusic.ui.items.ArtistItemPlaceholder
+import dev.jigen.zimusic.ui.items.PlaylistItem
+import dev.jigen.zimusic.ui.items.PlaylistItemPlaceholder
+import dev.jigen.zimusic.ui.items.SongItem
+import dev.jigen.zimusic.ui.items.SongItemPlaceholder
+import dev.jigen.zimusic.ui.items.VideoItem
+import dev.jigen.zimusic.ui.items.VideoItemPlaceholder
+import dev.jigen.zimusic.ui.screens.GlobalRoutes
+import dev.jigen.zimusic.ui.screens.Route
+import dev.jigen.zimusic.ui.screens.albumRoute
+import dev.jigen.zimusic.ui.screens.artistRoute
+import dev.jigen.zimusic.ui.screens.playlistRoute
 import dev.jigen.zimusic.utils.addNext
 import dev.jigen.zimusic.utils.asMediaItem
 import dev.jigen.zimusic.utils.forcePlay
 import dev.jigen.zimusic.utils.playingSong
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-import androidx.compose.foundation.gestures.detectTapGestures
 
 
 private enum class SwipeState {
@@ -151,7 +162,6 @@ fun SearchResultScreen(query: String, onSearchAgain: () -> Unit) {
 
                                 Box(
                                     modifier = Modifier
-                                        .background(colorPalette.background0) // Set background on the whole Box
                                 ) {
                                     // Background content (Action Icon) with new animation
                                     Box(

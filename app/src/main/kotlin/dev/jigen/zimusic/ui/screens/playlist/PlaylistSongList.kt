@@ -3,10 +3,18 @@ package dev.jigen.zimusic.ui.screens.playlist
 import android.content.Intent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -14,8 +22,12 @@ import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.FractionalThreshold
 import androidx.compose.material.rememberSwipeableState
 import androidx.compose.material.swipeable
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
@@ -43,10 +55,26 @@ import dev.jigen.zimusic.query
 import dev.jigen.zimusic.transaction
 import dev.jigen.zimusic.ui.components.LocalMenuState
 import dev.jigen.zimusic.ui.components.ShimmerHost
-import dev.jigen.zimusic.ui.components.themed.*
+import dev.jigen.zimusic.ui.components.themed.FloatingActionsContainerWithScrollToTop
+import dev.jigen.zimusic.ui.components.themed.Header
+import dev.jigen.zimusic.ui.components.themed.HeaderIconButton
+import dev.jigen.zimusic.ui.components.themed.HeaderPlaceholder
+import dev.jigen.zimusic.ui.components.themed.LayoutWithAdaptiveThumbnail
+import dev.jigen.zimusic.ui.components.themed.NonQueuedMediaItemMenu
+import dev.jigen.zimusic.ui.components.themed.PlaylistInfo
+import dev.jigen.zimusic.ui.components.themed.SecondaryTextButton
+import dev.jigen.zimusic.ui.components.themed.TextFieldDialog
+import dev.jigen.zimusic.ui.components.themed.adaptiveThumbnailContent
 import dev.jigen.zimusic.ui.items.SongItem
 import dev.jigen.zimusic.ui.items.SongItemPlaceholder
-import dev.jigen.zimusic.utils.*
+import dev.jigen.zimusic.utils.PlaylistDownloadIcon
+import dev.jigen.zimusic.utils.addNext
+import dev.jigen.zimusic.utils.asMediaItem
+import dev.jigen.zimusic.utils.completed
+import dev.jigen.zimusic.utils.enqueue
+import dev.jigen.zimusic.utils.forcePlayAtIndex
+import dev.jigen.zimusic.utils.forcePlayFromBeginning
+import dev.jigen.zimusic.utils.playingSong
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -91,7 +119,7 @@ fun PlaylistSongList(
     if (isImportingPlaylist) TextFieldDialog(
         hintText = stringResource(R.string.enter_playlist_name_prompt),
         initialTextInput = playlistPage?.title.orEmpty(),
-        onDismiss = { isImportingPlaylist = false },
+        onDismiss = { },
         onAccept = { text ->
             query {
                 transaction {
@@ -140,7 +168,7 @@ fun PlaylistSongList(
             HeaderIconButton(
                 icon = R.drawable.add,
                 color = colorPalette.text,
-                onClick = { isImportingPlaylist = true }
+                onClick = { }
             )
 
             HeaderIconButton(
@@ -182,7 +210,6 @@ fun PlaylistSongList(
                     .only(WindowInsetsSides.Vertical + WindowInsetsSides.End)
                     .asPaddingValues(),
                 modifier = Modifier
-                    .background(colorPalette.background0)
                     .fillMaxSize()
             ) {
                 item(
@@ -221,7 +248,6 @@ fun PlaylistSongList(
 
                     Box(
                         modifier = Modifier
-                            .background(colorPalette.background0)
                     ) {
                         Box(
                             modifier = Modifier

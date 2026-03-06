@@ -3,7 +3,6 @@ package dev.jigen.zimusic.ui.screens.home
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +25,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.jigen.compose.persist.persistList
+import dev.jigen.core.data.enums.ArtistSortBy
+import dev.jigen.core.data.enums.SortOrder
+import dev.jigen.core.ui.Dimensions
+import dev.jigen.core.ui.LocalAppearance
 import dev.jigen.zimusic.Database
 import dev.jigen.zimusic.LocalPlayerAwareWindowInsets
 import dev.jigen.zimusic.R
@@ -36,11 +40,6 @@ import dev.jigen.zimusic.ui.components.themed.Header
 import dev.jigen.zimusic.ui.components.themed.HeaderIconButton
 import dev.jigen.zimusic.ui.items.ArtistItem
 import dev.jigen.zimusic.ui.screens.Route
-import dev.jigen.compose.persist.persistList
-import dev.jigen.core.data.enums.ArtistSortBy
-import dev.jigen.core.data.enums.SortOrder
-import dev.jigen.core.ui.Dimensions
-import dev.jigen.core.ui.LocalAppearance
 import kotlinx.collections.immutable.toImmutableList
 
 @Route
@@ -79,7 +78,6 @@ fun HomeArtistList(
                 .asPaddingValues(),
             horizontalArrangement = Arrangement.Center,
             modifier = Modifier
-                .background(colorPalette.background0)
                 .fillMaxSize()
         ) {
             item(

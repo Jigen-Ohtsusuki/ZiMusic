@@ -2,10 +2,17 @@ package dev.jigen.zimusic.ui.screens.builtinplaylist
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -13,8 +20,12 @@ import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.FractionalThreshold
 import androidx.compose.material.rememberSwipeableState
 import androidx.compose.material.swipeable
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
@@ -37,13 +48,28 @@ import dev.jigen.zimusic.R
 import dev.jigen.zimusic.models.Song
 import dev.jigen.zimusic.preferences.DataPreferences
 import dev.jigen.zimusic.ui.components.LocalMenuState
-import dev.jigen.zimusic.ui.components.themed.*
+import dev.jigen.zimusic.ui.components.themed.FloatingActionsContainerWithScrollToTop
+import dev.jigen.zimusic.ui.components.themed.Header
+import dev.jigen.zimusic.ui.components.themed.InHistoryMediaItemMenu
+import dev.jigen.zimusic.ui.components.themed.NonQueuedMediaItemMenu
+import dev.jigen.zimusic.ui.components.themed.SecondaryTextButton
+import dev.jigen.zimusic.ui.components.themed.ValueSelectorDialog
 import dev.jigen.zimusic.ui.items.SongItem
 import dev.jigen.zimusic.ui.screens.home.HeaderSongSortBy
-import dev.jigen.zimusic.utils.*
+import dev.jigen.zimusic.utils.PlaylistDownloadIcon
+import dev.jigen.zimusic.utils.addNext
+import dev.jigen.zimusic.utils.asMediaItem
+import dev.jigen.zimusic.utils.enqueue
+import dev.jigen.zimusic.utils.forcePlayAtIndex
+import dev.jigen.zimusic.utils.forcePlayFromBeginning
+import dev.jigen.zimusic.utils.playingSong
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.cancellable
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 
 private enum class SwipeState {
     Covered,
@@ -114,7 +140,6 @@ fun BuiltInPlaylistSongs(
                 .only(WindowInsetsSides.Vertical + WindowInsetsSides.End)
                 .asPaddingValues(),
             modifier = Modifier
-                .background(colorPalette.background0)
                 .fillMaxSize()
         ) {
             item(
@@ -205,7 +230,6 @@ fun BuiltInPlaylistSongs(
 
                 Box(
                     modifier = Modifier
-                        .background(colorPalette.background0)
                 ) {
                     Box(
                         modifier = Modifier

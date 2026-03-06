@@ -20,15 +20,3 @@ enum class ColorSource {
     Dynamic,
     MaterialYou
 }
-
-enum class ColorMode {
-    System,
-    Light,
-    Dark
-}
-
-enum class Darkness {
-    Normal,
-    AMOLED,
-    PureBlack
-}

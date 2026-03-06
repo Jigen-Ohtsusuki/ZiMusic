@@ -1,7 +1,6 @@
 package dev.jigen.zimusic.ui.screens.album
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +15,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import dev.jigen.core.ui.Dimensions
+import dev.jigen.core.ui.LocalAppearance
+import dev.jigen.core.ui.utils.isLandscape
 import dev.jigen.zimusic.LocalPlayerAwareWindowInsets
 import dev.jigen.zimusic.LocalPlayerServiceBinder
 import dev.jigen.zimusic.R
@@ -34,9 +36,6 @@ import dev.jigen.zimusic.utils.enqueue
 import dev.jigen.zimusic.utils.forcePlayAtIndex
 import dev.jigen.zimusic.utils.forcePlayFromBeginning
 import dev.jigen.zimusic.utils.playingSong
-import dev.jigen.core.ui.Dimensions
-import dev.jigen.core.ui.LocalAppearance
-import dev.jigen.core.ui.utils.isLandscape
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 
@@ -56,7 +55,7 @@ fun AlbumSongs(
     thumbnailContent = thumbnailContent,
     modifier = modifier
 ) {
-    val (colorPalette) = LocalAppearance.current
+    val (_) = LocalAppearance.current
     val binder = LocalPlayerServiceBinder.current
     val menuState = LocalMenuState.current
     val lazyListState = rememberLazyListState()
@@ -70,7 +69,6 @@ fun AlbumSongs(
                 .only(WindowInsetsSides.Vertical + WindowInsetsSides.End)
                 .asPaddingValues(),
             modifier = Modifier
-                .background(colorPalette.background0)
                 .fillMaxSize()
         ) {
             item(

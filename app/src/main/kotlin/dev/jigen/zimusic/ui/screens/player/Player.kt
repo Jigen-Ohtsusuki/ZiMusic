@@ -1,8 +1,6 @@
 package dev.jigen.zimusic.ui.screens.player
 
-import android.os.Build
 import androidx.annotation.OptIn
-import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -50,9 +48,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -62,6 +59,18 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import coil3.compose.AsyncImage
+import dev.jigen.compose.persist.PersistMapCleanup
+import dev.jigen.compose.routing.OnGlobalRoute
+import dev.jigen.core.ui.Dimensions
+import dev.jigen.core.ui.LocalAppearance
+import dev.jigen.core.ui.ThumbnailRoundness
+import dev.jigen.core.ui.collapsedPlayerProgressBar
+import dev.jigen.core.ui.utils.isLandscape
+import dev.jigen.core.ui.utils.px
+import dev.jigen.core.ui.utils.roundedShape
+import dev.jigen.core.ui.utils.songBundle
+import dev.jigen.providers.innertube.models.NavigationEndpoint
 import dev.jigen.zimusic.Database
 import dev.jigen.zimusic.LocalPlayerServiceBinder
 import dev.jigen.zimusic.R
@@ -70,10 +79,10 @@ import dev.jigen.zimusic.preferences.PlayerPreferences
 import dev.jigen.zimusic.query
 import dev.jigen.zimusic.service.PlayerService
 import dev.jigen.zimusic.transaction
+import dev.jigen.zimusic.ui.components.AuroraBackground
 import dev.jigen.zimusic.ui.components.BottomSheet
 import dev.jigen.zimusic.ui.components.BottomSheetState
 import dev.jigen.zimusic.ui.components.LocalMenuState
-import dev.jigen.zimusic.ui.components.rememberBottomSheetState
 import dev.jigen.zimusic.ui.components.themed.BaseMediaItemMenu
 import dev.jigen.zimusic.ui.components.themed.IconButton
 import dev.jigen.zimusic.ui.components.themed.SecondaryTextButton
@@ -90,26 +99,13 @@ import dev.jigen.zimusic.utils.secondary
 import dev.jigen.zimusic.utils.semiBold
 import dev.jigen.zimusic.utils.shouldBePlaying
 import dev.jigen.zimusic.utils.thumbnail
-import dev.jigen.compose.persist.PersistMapCleanup
-import dev.jigen.compose.routing.OnGlobalRoute
-import dev.jigen.core.ui.Dimensions
-import dev.jigen.core.ui.LocalAppearance
-import dev.jigen.core.ui.ThumbnailRoundness
-import dev.jigen.core.ui.collapsedPlayerProgressBar
-import dev.jigen.core.ui.utils.isLandscape
-import dev.jigen.core.ui.utils.px
-import dev.jigen.core.ui.utils.roundedShape
-import dev.jigen.core.ui.utils.songBundle
-import dev.jigen.providers.innertube.models.NavigationEndpoint
-import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.absoluteValue
 
 private enum class PlayerContentState {
-    Thumbnail, Lyrics
+    Thumbnail, Lyrics, Queue
 }
 
-@RequiresApi(Build.VERSION_CODES.P)
 @Composable
 fun Player(
     layoutState: BottomSheetState,
@@ -349,34 +345,30 @@ fun Player(
     ) {
         var playerContentState by rememberSaveable { mutableStateOf(PlayerContentState.Thumbnail) }
 
-        // When the song changes, reset to thumbnail view
         LaunchedEffect(mediaItem?.mediaId) {
             playerContentState = PlayerContentState.Thumbnail
         }
 
-        val playerBottomSheetState = rememberBottomSheetState(
-            dismissedBound = 64.dp + horizontalBottomPaddingValues.calculateBottomPadding(),
-            expandedBound = layoutState.expandedBound
-        )
+        val bottomBarHeight = 64.dp + horizontalBottomPaddingValues.calculateBottomPadding()
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(shape)
-                .background(
-                    Brush.verticalGradient(
-                        0.5f to colorPalette.background1,
-                        1f to colorPalette.background0
-                    )
-                )
         ) {
+            AuroraBackground(
+                artworkUri = metadata?.artworkUri,
+                fallbackColor = colorPalette.background0,
+                modifier = Modifier.fillMaxSize()
+            )
+
             val containerModifier = Modifier
                 .padding(
                     windowInsets
                         .only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
                         .asPaddingValues()
                 )
-                .padding(bottom = playerBottomSheetState.collapsedBound)
+                .padding(bottom = bottomBarHeight) // Ensure space for the new bottom bar
 
             val controlsContent: @Composable (modifier: Modifier) -> Unit = { innerModifier ->
                 Controls(
@@ -386,6 +378,17 @@ fun Player(
                     setLikedAt = { likedAt = it },
                     shouldBePlaying = shouldBePlaying,
                     position = position,
+                    onShowMenu = {
+                        mediaItem?.let {
+                            menuState.display {
+                                PlayerMenu(
+                                    onDismiss = menuState::hide,
+                                    mediaItem = it,
+                                    binder = binder,
+                                )
+                            }
+                        }
+                    },
                     modifier = innerModifier
                 )
             }
@@ -413,11 +416,9 @@ fun Player(
                         when (state) {
                             PlayerContentState.Thumbnail -> {
                                 Thumbnail(
-                                    onTap = { playerContentState = PlayerContentState.Lyrics },
+                                    onTap = { /* Buttons below handle this now */ },
                                     onDoubleTap = { newLikedAt -> likedAt = newLikedAt },
-                                    likedAt = currentLikedAt,
-                                    modifier = Modifier
-                                        .nestedScroll(layoutState.preUpPostDownNestedScrollConnection)
+                                    likedAt = currentLikedAt
                                 )
                             }
                             PlayerContentState.Lyrics -> {
@@ -434,6 +435,14 @@ fun Player(
                                             .clip(thumbnailCornerSize.roundedShape),
                                     )
                                 }
+                            }
+                            PlayerContentState.Queue -> {
+                                Queue(
+                                    binder = binder,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(thumbnailCornerSize.roundedShape)
+                                )
                             }
                         }
                     }
@@ -468,11 +477,9 @@ fun Player(
                         when (state) {
                             PlayerContentState.Thumbnail -> {
                                 Thumbnail(
-                                    onTap = { playerContentState = PlayerContentState.Lyrics },
+                                    onTap = { /* Buttons below handle this now */ },
                                     onDoubleTap = { newLikedAt -> likedAt = newLikedAt },
-                                    likedAt = currentLikedAt,
-                                    modifier = Modifier
-                                        .nestedScroll(layoutState.preUpPostDownNestedScrollConnection)
+                                    likedAt = currentLikedAt
                                 )
                             }
                             PlayerContentState.Lyrics -> {
@@ -490,6 +497,14 @@ fun Player(
                                     )
                                 }
                             }
+                            PlayerContentState.Queue -> {
+                                Queue(
+                                    binder = binder,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(thumbnailCornerSize.roundedShape)
+                                )
+                            }
                         }
                     }
                 }
@@ -501,93 +516,91 @@ fun Player(
                         .weight(1f)
                 )
             }
-        }
 
-        // REMOVED: Speed/Pitch Slider Dialog Logic
+            var boostDialogOpen by rememberSaveable { mutableStateOf(false) }
 
-        var boostDialogOpen by rememberSaveable { mutableStateOf(false) }
-
-        if (boostDialogOpen) {
-            fun submit(state: Float) = transaction {
-                mediaItem?.mediaId?.let { mediaId ->
-                    Database.instance.setLoudnessBoost(
-                        songId = mediaId,
-                        loudnessBoost = state.takeUnless { it == 0f }
-                    )
+            if (boostDialogOpen) {
+                fun submit(state: Float) = transaction {
+                    mediaItem?.mediaId?.let { mediaId ->
+                        Database.instance.setLoudnessBoost(
+                            songId = mediaId,
+                            loudnessBoost = state.takeUnless { it == 0f }
+                        )
+                    }
                 }
-            }
 
-            SliderDialog(
-                onDismiss = {},
-                title = stringResource(R.string.volume_boost)
-            ) {
-                SliderDialogBody(
-                    provideState = {
-                        val state = remember { mutableFloatStateOf(0f) }
-
-                        LaunchedEffect(mediaItem) {
-                            mediaItem?.mediaId?.let { mediaId ->
-                                Database.instance
-                                    .loudnessBoost(mediaId)
-                                    .distinctUntilChanged()
-                                    .collect { boost: Float? -> state.floatValue = boost ?: 0f }
-                            }
-                        }
-
-                        state
-                    },
-                    onSlideComplete = { submit(it) },
-                    min = -20f,
-                    max = 20f,
-                    toDisplay = { stringResource(R.string.format_db, "%.2f".format(it)) }
-                )
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
+                SliderDialog(
+                    onDismiss = {},
+                    title = stringResource(R.string.volume_boost)
                 ) {
-                    SecondaryTextButton(
-                        text = stringResource(R.string.reset),
-                        onClick = { submit(0f) }
+                    SliderDialogBody(
+                        provideState = {
+                            val state = remember { mutableFloatStateOf(0f) }
+
+                            LaunchedEffect(mediaItem) {
+                                mediaItem?.mediaId?.let { mediaId ->
+                                    Database.instance
+                                        .loudnessBoost(mediaId)
+                                        .distinctUntilChanged()
+                                        .collect { boost: Float? -> state.floatValue = boost ?: 0f }
+                                }
+                            }
+
+                            state
+                        },
+                        onSlideComplete = { submit(it) },
+                        min = -20f,
+                        max = 20f,
+                        toDisplay = { stringResource(R.string.format_db, "%.2f".format(it)) }
                     )
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        SecondaryTextButton(
+                            text = stringResource(R.string.reset),
+                            onClick = { submit(0f) }
+                        )
+                    }
                 }
             }
-        }
-        Queue(
-            layoutState = playerBottomSheetState,
-            binder = binder,
-            beforeContent = {
-                if (playerLayout == PlayerPreferences.PlayerLayout.New) IconButton(
-                    onClick = { trackLoopEnabled = !trackLoopEnabled },
-                    icon = R.drawable.infinite,
-                    enabled = trackLoopEnabled,
-                    modifier = Modifier
-                        .padding(vertical = 8.dp)
-                        .size(20.dp)
-                ) else Spacer(modifier = Modifier.width(20.dp))
-            },
-            afterContent = {
+
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(Color.Transparent)
+                    .height(bottomBarHeight)
+                    .padding(horizontalBottomPaddingValues),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 IconButton(
-                    icon = R.drawable.ellipsis_horizontal,
-                    color = colorPalette.text,
-                    onClick = {
-                        mediaItem?.let {
-                            menuState.display {
-                                PlayerMenu(
-                                    onDismiss = menuState::hide,
-                                    mediaItem = it,
-                                    binder = binder,
-                                )
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .padding(vertical = 8.dp)
-                        .size(20.dp)
+                    icon = R.drawable.infinite,
+                    color = if (trackLoopEnabled) colorPalette.text else colorPalette.textDisabled,
+                    onClick = { trackLoopEnabled = !trackLoopEnabled },
+                    modifier = Modifier.padding(8.dp).size(24.dp)
                 )
-            },
-            modifier = Modifier.align(Alignment.BottomCenter),
-            shape = shape
-        )
+
+                IconButton(
+                    icon = R.drawable.playlist,
+                    color = if (playerContentState == PlayerContentState.Queue) colorPalette.text else colorPalette.textDisabled,
+                    onClick = {
+                        playerContentState = if (playerContentState == PlayerContentState.Queue) PlayerContentState.Thumbnail else PlayerContentState.Queue
+                    },
+                    modifier = Modifier.padding(8.dp).size(24.dp)
+                )
+
+                IconButton(
+                    icon = R.drawable.musical_notes,
+                    color = if (playerContentState == PlayerContentState.Lyrics) colorPalette.text else colorPalette.textDisabled,
+                    onClick = {
+                        playerContentState = if (playerContentState == PlayerContentState.Lyrics) PlayerContentState.Thumbnail else PlayerContentState.Lyrics
+                    },
+                    modifier = Modifier.padding(8.dp).size(24.dp)
+                )
+            }
+        }
     }
 }
 

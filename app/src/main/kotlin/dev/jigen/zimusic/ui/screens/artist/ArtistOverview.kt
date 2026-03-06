@@ -1,7 +1,6 @@
 package dev.jigen.zimusic.ui.screens.artist
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +23,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.jigen.core.ui.Dimensions
+import dev.jigen.core.ui.LocalAppearance
+import dev.jigen.core.ui.utils.isLandscape
+import dev.jigen.providers.innertube.Innertube
+import dev.jigen.providers.innertube.models.NavigationEndpoint
 import dev.jigen.zimusic.LocalPlayerAwareWindowInsets
 import dev.jigen.zimusic.LocalPlayerServiceBinder
 import dev.jigen.zimusic.R
@@ -45,11 +49,6 @@ import dev.jigen.zimusic.utils.medium
 import dev.jigen.zimusic.utils.playingSong
 import dev.jigen.zimusic.utils.secondary
 import dev.jigen.zimusic.utils.semiBold
-import dev.jigen.core.ui.Dimensions
-import dev.jigen.core.ui.LocalAppearance
-import dev.jigen.core.ui.utils.isLandscape
-import dev.jigen.providers.innertube.Innertube
-import dev.jigen.providers.innertube.models.NavigationEndpoint
 
 private val sectionTextModifier = Modifier
     .padding(horizontal = 16.dp)
@@ -70,7 +69,7 @@ fun ArtistOverview(
     thumbnailContent = thumbnailContent,
     modifier = modifier
 ) {
-    val (colorPalette, typography) = LocalAppearance.current
+    val (_, typography) = LocalAppearance.current
     val binder = LocalPlayerServiceBinder.current
     val menuState = LocalMenuState.current
     val windowInsets = LocalPlayerAwareWindowInsets.current
@@ -83,7 +82,6 @@ fun ArtistOverview(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .background(colorPalette.background0)
                 .fillMaxSize()
                 .verticalScroll(scrollState)
                 .padding(

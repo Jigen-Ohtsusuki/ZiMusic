@@ -77,8 +77,6 @@ import dev.jigen.providers.innertube.Innertube
 import dev.jigen.providers.innertube.models.NavigationEndpoint
 import dev.jigen.providers.innertube.requests.discoverPage
 
-// TODO: a lot of duplicate code all around the codebase, especially for discover
-
 @OptIn(ExperimentalFoundationApi::class)
 @Route
 @Composable
@@ -90,7 +88,7 @@ fun HomeDiscovery(
     onMoreAlbumsClick: () -> Unit,
     onPlaylistClick: (browseId: String) -> Unit
 ) {
-    val (colorPalette, typography) = LocalAppearance.current
+    val (_, typography) = LocalAppearance.current
     val windowInsets = LocalPlayerAwareWindowInsets.current
     val menuState = LocalMenuState.current
     val binder = LocalPlayerServiceBinder.current
@@ -125,7 +123,6 @@ fun HomeDiscovery(
 
         Column(
             modifier = Modifier
-                .background(colorPalette.background0)
                 .fillMaxSize()
                 .verticalScroll(scrollState)
                 .padding(

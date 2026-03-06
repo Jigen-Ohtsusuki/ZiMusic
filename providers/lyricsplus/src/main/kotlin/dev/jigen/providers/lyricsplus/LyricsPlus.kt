@@ -69,6 +69,7 @@ object LyricsPlus {
             parameter("album", album)
         }
 
+        println(response.request.url.toString())
         val responseText = response.bodyAsText()
 
         return Json { ignoreUnknownKeys = true }

@@ -1,6 +1,5 @@
 package dev.jigen.zimusic.ui.screens.mood
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +21,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEachIndexed
+import com.valentinilk.shimmer.shimmer
+import dev.jigen.compose.persist.persist
+import dev.jigen.core.ui.Dimensions
+import dev.jigen.core.ui.LocalAppearance
+import dev.jigen.providers.innertube.Innertube
+import dev.jigen.providers.innertube.models.bodies.BrowseBody
+import dev.jigen.providers.innertube.requests.BrowseResult
+import dev.jigen.providers.innertube.requests.browse
 import dev.jigen.zimusic.LocalPlayerAwareWindowInsets
 import dev.jigen.zimusic.R
 import dev.jigen.zimusic.ui.components.ShimmerHost
@@ -30,14 +37,6 @@ import dev.jigen.zimusic.ui.components.themed.HeaderPlaceholder
 import dev.jigen.zimusic.ui.items.SongItemPlaceholder
 import dev.jigen.zimusic.ui.screens.home.MoodItem
 import dev.jigen.zimusic.utils.semiBold
-import dev.jigen.compose.persist.persist
-import dev.jigen.core.ui.Dimensions
-import dev.jigen.core.ui.LocalAppearance
-import dev.jigen.providers.innertube.Innertube
-import dev.jigen.providers.innertube.models.bodies.BrowseBody
-import dev.jigen.providers.innertube.requests.BrowseResult
-import dev.jigen.providers.innertube.requests.browse
-import com.valentinilk.shimmer.shimmer
 import kotlinx.collections.immutable.toImmutableList
 
 private const val DEFAULT_BROWSE_ID = "FEmusic_moods_and_genres"
@@ -48,7 +47,7 @@ fun MoreMoodsList(
     modifier: Modifier = Modifier,
     columns: Int = 2
 ) {
-    val (colorPalette, typography) = LocalAppearance.current
+    val (_, typography) = LocalAppearance.current
     val windowInsets = LocalPlayerAwareWindowInsets.current
 
     val endPaddingValues = windowInsets.only(WindowInsetsSides.End).asPaddingValues()
@@ -82,7 +81,6 @@ fun MoreMoodsList(
             .only(WindowInsetsSides.Vertical + WindowInsetsSides.End)
             .asPaddingValues(),
         modifier = modifier
-            .background(colorPalette.background0)
             .fillMaxSize()
     ) {
         item(

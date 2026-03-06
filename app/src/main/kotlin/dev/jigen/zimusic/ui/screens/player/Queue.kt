@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -31,7 +30,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,11 +44,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -68,12 +63,9 @@ import dev.jigen.zimusic.preferences.AppearancePreferences
 import dev.jigen.zimusic.preferences.PlayerPreferences
 import dev.jigen.zimusic.service.PlayerService
 import dev.jigen.zimusic.transaction
-import dev.jigen.zimusic.ui.components.BottomSheet
-import dev.jigen.zimusic.ui.components.BottomSheetState
 import dev.jigen.zimusic.ui.components.LocalMenuState
 import dev.jigen.zimusic.ui.components.MusicBars
 import dev.jigen.zimusic.ui.components.themed.BaseMediaItemMenu
-import dev.jigen.zimusic.ui.components.themed.FloatingActionsContainerWithScrollToTop
 import dev.jigen.zimusic.ui.components.themed.HorizontalDivider
 import dev.jigen.zimusic.ui.components.themed.IconButton
 import dev.jigen.zimusic.ui.components.themed.Menu
@@ -82,20 +74,18 @@ import dev.jigen.zimusic.ui.components.themed.QueuedMediaItemMenu
 import dev.jigen.zimusic.ui.components.themed.ReorderHandle
 import dev.jigen.zimusic.ui.components.themed.SecondaryTextButton
 import dev.jigen.zimusic.ui.components.themed.TextFieldDialog
-import dev.jigen.zimusic.ui.components.themed.TextToggle
 import dev.jigen.zimusic.ui.items.SongItem
 import dev.jigen.zimusic.ui.items.SongItemPlaceholder
 import dev.jigen.zimusic.ui.modifiers.swipeToClose
 import dev.jigen.zimusic.utils.DisposableListener
 import dev.jigen.zimusic.utils.addNext
 import dev.jigen.zimusic.utils.asMediaItem
+import dev.jigen.zimusic.utils.color
 import dev.jigen.zimusic.utils.enqueue
-import dev.jigen.zimusic.utils.medium
+import dev.jigen.zimusic.utils.bold
 import dev.jigen.zimusic.utils.onFirst
 import dev.jigen.zimusic.utils.semiBold
 import dev.jigen.zimusic.utils.shouldBePlaying
-import dev.jigen.zimusic.utils.shuffleQueue
-import dev.jigen.zimusic.utils.smoothScrollToTop
 import dev.jigen.zimusic.utils.windows
 import dev.jigen.compose.persist.persist
 import dev.jigen.compose.reordering.draggedItem
@@ -105,37 +95,23 @@ import dev.jigen.core.data.enums.SortOrder
 import dev.jigen.core.ui.Dimensions
 import dev.jigen.core.ui.LocalAppearance
 import dev.jigen.core.ui.onOverlay
-import dev.jigen.core.ui.utils.roundedShape
 import dev.jigen.providers.innertube.Innertube
 import dev.jigen.providers.innertube.models.bodies.NextBody
 import dev.jigen.providers.innertube.requests.nextPage
 import com.valentinilk.shimmer.shimmer
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Queue(
-    layoutState: BottomSheetState,
     binder: PlayerService.Binder,
-    beforeContent: @Composable RowScope.() -> Unit,
-    afterContent: @Composable RowScope.() -> Unit,
     modifier: Modifier = Modifier,
-    shape: RoundedCornerShape = RoundedCornerShape(
-        topStart = 12.dp,
-        topEnd = 12.dp
-    ),
-    scrollConnection: NestedScrollConnection = remember(layoutState::preUpPostDownNestedScrollConnection),
     windowInsets: WindowInsets = WindowInsets.systemBars
 ) {
     val (colorPalette, typography, _, thumbnailShape) = LocalAppearance.current
     val menuState = LocalMenuState.current
-
-    val horizontalBottomPaddingValues = windowInsets
-        .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
-        .asPaddingValues()
 
     var suggestions by persist<Result<List<MediaItem>?>?>(tag = "queue/suggestions")
 
@@ -207,386 +183,306 @@ fun Queue(
         }
     }
 
-    BottomSheet(
-        state = layoutState,
-        modifier = modifier.fillMaxSize(),
-        collapsedContent = { innerModifier ->
-            Row(
-                modifier = Modifier
-                    .clip(shape)
-                    .background(colorPalette.background2)
-                    .fillMaxSize()
-                    .then(innerModifier)
-                    .padding(horizontalBottomPaddingValues),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Spacer(modifier = Modifier.width(4.dp))
-                beforeContent()
-                Spacer(modifier = Modifier.weight(1f))
+    val musicBarsTransition = updateTransition(
+        targetState = if (reorderingState.isDragging) -1L else mediaItemIndex,
+        label = ""
+    )
 
-                Image(
-                    painter = painterResource(R.drawable.playlist),
-                    contentDescription = null,
-                    colorFilter = ColorFilter.tint(colorPalette.text),
-                    modifier = Modifier.size(18.dp)
-                )
+    LaunchedEffect(Unit) {
+        lazyListState.scrollToItem(mediaItemIndex.coerceAtLeast(0))
+    }
 
-                Spacer(modifier = Modifier.weight(1f))
-                afterContent()
-                Spacer(modifier = Modifier.width(4.dp))
-            }
-        }
-    ) {
-        val musicBarsTransition = updateTransition(
-            targetState = if (reorderingState.isDragging) -1L else mediaItemIndex,
-            label = ""
-        )
+    Column(modifier = modifier.fillMaxSize().background(Color.Transparent)) {
+        // --- QUEUE HEADER ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            BasicText(
+                text = pluralStringResource(
+                    id = R.plurals.song_count_plural,
+                    count = windows.size,
+                    windows.size
+                ),
+                style = typography.m.bold.color(colorPalette.text)
+            )
 
-        LaunchedEffect(Unit) {
-            lazyListState.scrollToItem(mediaItemIndex.coerceAtLeast(0))
-        }
+            IconButton(
+                icon = R.drawable.playlist,
+                color = colorPalette.text,
+                onClick = {
+                    fun addToPlaylist(playlist: Playlist, index: Int) = transaction {
+                        val playlistId = Database.instance
+                            .insert(playlist)
+                            .takeIf { it != -1L } ?: playlist.id
 
-        Column {
-            Box(
-                modifier = Modifier
-                    .clip(shape)
-                    .background(colorPalette.background1)
-                    .weight(1f)
-            ) {
-                LookaheadScope {
-                    LazyColumn(
-                        state = lazyListState,
-                        contentPadding = windowInsets
-                            .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)
-                            .asPaddingValues(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.nestedScroll(scrollConnection)
-                    ) {
-                        itemsIndexed(
-                            items = windows,
-                            key = { _, window -> window.uid.hashCode() },
-                            contentType = { _, _ -> ContentType.Window }
-                        ) { i, window ->
-                            val isPlayingThisMediaItem = mediaItemIndex == window.firstPeriodIndex
+                        windows.forEachIndexed { i, window ->
+                            val mediaItem = window.mediaItem
 
-                            SongItem(
-                                song = window.mediaItem,
-                                thumbnailSize = Dimensions.thumbnails.song,
-                                onThumbnailContent = {
-                                    musicBarsTransition.AnimatedVisibility(
-                                        visible = { it == window.firstPeriodIndex },
-                                        enter = fadeIn(tween(800)),
-                                        exit = fadeOut(tween(800))
-                                    ) {
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier
-                                                .background(
-                                                    color = Color.Black.copy(alpha = 0.25f),
-                                                    shape = thumbnailShape
-                                                )
-                                                .size(Dimensions.thumbnails.song)
-                                        ) {
-                                            if (shouldBePlaying) MusicBars(
-                                                color = colorPalette.onOverlay,
-                                                modifier = Modifier.height(24.dp)
-                                            ) else Image(
-                                                painter = painterResource(R.drawable.play),
-                                                contentDescription = null,
-                                                colorFilter = ColorFilter.tint(colorPalette.onOverlay),
-                                                modifier = Modifier.size(24.dp)
-                                            )
-                                        }
-                                    }
-                                },
-                                trailingContent = {
-                                    ReorderHandle(
-                                        reorderingState = reorderingState,
-                                        index = i
-                                    )
-                                },
+                            Database.instance.insert(mediaItem)
+                            Database.instance.insert(
+                                SongPlaylistMap(
+                                    songId = mediaItem.mediaId,
+                                    playlistId = playlistId,
+                                    position = index + i
+                                )
+                            )
+                        }
+                    }
+
+                    menuState.display {
+                        var isCreatingNewPlaylist by rememberSaveable {
+                            mutableStateOf(false)
+                        }
+
+                        val playlistPreviews by remember {
+                            Database.instance
+                                .playlistPreviews(
+                                    sortBy = PlaylistSortBy.DateAdded,
+                                    sortOrder = SortOrder.Descending
+                                )
+                                .onFirst { isCreatingNewPlaylist = it.isEmpty() }
+                        }.collectAsState(initial = null, context = Dispatchers.IO)
+
+                        if (isCreatingNewPlaylist) TextFieldDialog(
+                            hintText = stringResource(R.string.enter_playlist_name_prompt),
+                            onDismiss = { isCreatingNewPlaylist = false },
+                            onAccept = { text ->
+                                menuState.hide()
+                                addToPlaylist(Playlist(name = text), 0)
+                            }
+                        )
+
+                        Menu {
+                            Row(
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
-                                    .combinedClickable(
-                                        onLongClick = {
-                                            menuState.display {
-                                                QueuedMediaItemMenu(
-                                                    mediaItem = window.mediaItem,
-                                                    indexInQueue = if (isPlayingThisMediaItem) null
-                                                    else window.firstPeriodIndex,
-                                                    onDismiss = menuState::hide
-                                                )
-                                            }
-                                        },
-                                        onClick = {
-                                            if (isPlayingThisMediaItem) {
-                                                if (shouldBePlaying) binder.player.pause() else binder.player.play()
-                                            } else {
-                                                binder.player.seekToDefaultPosition(window.firstPeriodIndex)
-                                                binder.player.playWhenReady = true
-                                            }
-                                        }
+                                    .padding(horizontal = 24.dp, vertical = 8.dp)
+                                    .fillMaxWidth()
+                            ) {
+                                BasicText(
+                                    text = stringResource(R.string.add_queue_to_playlist),
+                                    style = typography.m.semiBold,
+                                    overflow = TextOverflow.Ellipsis,
+                                    maxLines = 2,
+                                    modifier = Modifier.weight(
+                                        weight = 2f,
+                                        fill = false
                                     )
-                                    .draggedItem(
-                                        reorderingState = reorderingState,
-                                        index = i
+                                )
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                SecondaryTextButton(
+                                    text = stringResource(R.string.new_playlist),
+                                    onClick = { isCreatingNewPlaylist = true },
+                                    alternative = true,
+                                    modifier = Modifier.weight(
+                                        weight = 1f,
+                                        fill = false
                                     )
-                                    .background(colorPalette.background1)
-                                    .let {
-                                        if (PlayerPreferences.horizontalSwipeToRemoveItem && !isPlayingThisMediaItem)
-                                            it.swipeToClose(
-                                                key = windows,
-                                                delay = 100.milliseconds,
-                                                requireUnconsumed = true
-                                            ) {
-                                                binder.player.removeMediaItem(window.firstPeriodIndex)
-                                            }
-                                        else it
-                                    },
-                                clip = !reorderingState.isDragging,
-                                hideExplicit = !isPlayingThisMediaItem && AppearancePreferences.hideExplicit
-                            )
-                        }
+                                )
+                            }
 
-                        item(
-                            key = "divider",
-                            contentType = { ContentType.Divider }
-                        ) {
-                            if (visibleSuggestions.isNotEmpty()) HorizontalDivider(
-                                modifier = Modifier.padding(start = 28.dp + Dimensions.thumbnails.song)
-                            )
-                        }
+                            if (playlistPreviews?.isEmpty() == true)
+                                Spacer(modifier = Modifier.height(160.dp))
 
-                        items(
-                            items = visibleSuggestions,
-                            key = { "suggestion_${it.mediaId}" },
-                            contentType = { ContentType.Suggestion }
-                        ) {
-                            SongItem(
-                                song = it,
-                                thumbnailSize = Dimensions.thumbnails.song,
-                                modifier = Modifier.clickable {
-                                    menuState.display {
-                                        BaseMediaItemMenu(
-                                            onDismiss = { menuState.hide() },
-                                            mediaItem = it,
-                                            onEnqueue = { binder.player.enqueue(it) },
-                                            onPlayNext = { binder.player.addNext(it) }
+                            playlistPreviews?.forEach { playlistPreview ->
+                                MenuEntry(
+                                    icon = R.drawable.playlist,
+                                    text = playlistPreview.playlist.name,
+                                    secondaryText = pluralStringResource(
+                                        id = R.plurals.song_count_plural,
+                                        count = playlistPreview.songCount,
+                                        playlistPreview.songCount
+                                    ),
+                                    onClick = {
+                                        menuState.hide()
+                                        addToPlaylist(
+                                            playlistPreview.playlist,
+                                            playlistPreview.songCount
                                         )
                                     }
-                                },
-                                trailingContent = {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(
-                                            space = 12.dp,
-                                            alignment = Alignment.End
-                                        )
+                                )
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Box(
+            modifier = Modifier.weight(1f)
+        ) {
+            LookaheadScope {
+                LazyColumn(
+                    state = lazyListState,
+                    contentPadding = windowInsets
+                        .only(WindowInsetsSides.Horizontal)
+                        .asPaddingValues(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    itemsIndexed(
+                        items = windows,
+                        key = { _, window -> window.uid.hashCode() },
+                        contentType = { _, _ -> ContentType.Window }
+                    ) { i, window ->
+                        val isPlayingThisMediaItem = mediaItemIndex == window.firstPeriodIndex
+
+                        SongItem(
+                            song = window.mediaItem,
+                            thumbnailSize = Dimensions.thumbnails.song,
+                            onThumbnailContent = {
+                                musicBarsTransition.AnimatedVisibility(
+                                    visible = { it == window.firstPeriodIndex },
+                                    enter = fadeIn(tween(800)),
+                                    exit = fadeOut(tween(800))
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .background(
+                                                color = Color.Black.copy(alpha = 0.25f),
+                                                shape = thumbnailShape
+                                            )
+                                            .size(Dimensions.thumbnails.song)
                                     ) {
-                                        IconButton(
-                                            icon = R.drawable.play_skip_forward,
-                                            color = colorPalette.text,
-                                            onClick = {
-                                                binder.player.addNext(it)
-                                            },
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        IconButton(
-                                            icon = R.drawable.enqueue,
-                                            color = colorPalette.text,
-                                            onClick = {
-                                                binder.player.enqueue(it)
-                                            },
-                                            modifier = Modifier.size(18.dp)
+                                        if (shouldBePlaying) MusicBars(
+                                            color = colorPalette.onOverlay,
+                                            modifier = Modifier.height(24.dp)
+                                        ) else Image(
+                                            painter = painterResource(R.drawable.play),
+                                            contentDescription = null,
+                                            colorFilter = ColorFilter.tint(colorPalette.onOverlay),
+                                            modifier = Modifier.size(24.dp)
                                         )
                                     }
                                 }
-                            )
-                        }
-
-                        item(
-                            key = "loading",
-                            contentType = { ContentType.Placeholder }
-                        ) {
-                            if (binder.isLoadingRadio || suggestions == null)
-                                Column(modifier = Modifier.shimmer()) {
-                                    repeat(3) { index ->
-                                        SongItemPlaceholder(
-                                            thumbnailSize = Dimensions.thumbnails.song,
-                                            modifier = Modifier
-                                                .alpha(1f - index * 0.125f)
-                                                .fillMaxWidth()
-                                        )
-                                    }
-                                }
-                        }
-                    }
-                }
-
-                FloatingActionsContainerWithScrollToTop(
-                    lazyListState = lazyListState,
-                    icon = R.drawable.shuffle,
-                    visible = !reorderingState.isDragging,
-                    insets = windowInsets.only(WindowInsetsSides.Horizontal),
-                    onClick = {
-                        reorderingState.coroutineScope.launch {
-                            lazyListState.smoothScrollToTop()
-                        }.invokeOnCompletion {
-                            binder.player.shuffleQueue()
-                        }
-                    }
-                )
-            }
-
-            Row(
-                modifier = Modifier
-                    .clickable(onClick = layoutState::collapseSoft)
-                    .background(colorPalette.background2)
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
-                    .padding(horizontalBottomPaddingValues)
-                    .height(64.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 1. Left container with a weight of 1
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    TextToggle(
-                        state = PlayerPreferences.queueLoopEnabled,
-                        toggleState = {
-                            PlayerPreferences.queueLoopEnabled = !PlayerPreferences.queueLoopEnabled
-                        },
-                        name = stringResource(R.string.queue_loop)
-                    )
-                }
-
-                // 2. Center item with no weight
-                Image(
-                    painter = painterResource(R.drawable.chevron_down),
-                    contentDescription = null,
-                    colorFilter = ColorFilter.tint(colorPalette.text),
-                    modifier = Modifier.size(18.dp)
-                )
-
-                // 3. Right container with a weight of 1
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.CenterEnd
-                ) {
-                    BasicText(
-                        text = pluralStringResource(
-                            id = R.plurals.song_count_plural,
-                            count = windows.size,
-                            windows.size
-                        ),
-                        style = typography.xxs.medium,
-                        modifier = Modifier
-                            .clip(16.dp.roundedShape)
-                            .clickable {
-                                fun addToPlaylist(playlist: Playlist, index: Int) = transaction {
-                                    val playlistId = Database.instance
-                                        .insert(playlist)
-                                        .takeIf { it != -1L } ?: playlist.id
-
-                                    windows.forEachIndexed { i, window ->
-                                        val mediaItem = window.mediaItem
-
-                                        Database.instance.insert(mediaItem)
-                                        Database.instance.insert(
-                                            SongPlaylistMap(
-                                                songId = mediaItem.mediaId,
-                                                playlistId = playlistId,
-                                                position = index + i
+                            },
+                            trailingContent = {
+                                ReorderHandle(
+                                    reorderingState = reorderingState,
+                                    index = i
+                                )
+                            },
+                            modifier = Modifier
+                                .combinedClickable(
+                                    onLongClick = {
+                                        menuState.display {
+                                            QueuedMediaItemMenu(
+                                                mediaItem = window.mediaItem,
+                                                indexInQueue = if (isPlayingThisMediaItem) null
+                                                else window.firstPeriodIndex,
+                                                onDismiss = menuState::hide
                                             )
-                                        )
-                                    }
-                                }
-
-                                menuState.display {
-                                    var isCreatingNewPlaylist by rememberSaveable {
-                                        mutableStateOf(
-                                            false
-                                        )
-                                    }
-
-                                    val playlistPreviews by remember {
-                                        Database.instance
-                                            .playlistPreviews(
-                                                sortBy = PlaylistSortBy.DateAdded,
-                                                sortOrder = SortOrder.Descending
-                                            )
-                                            .onFirst { isCreatingNewPlaylist = it.isEmpty() }
-                                    }.collectAsState(initial = null, context = Dispatchers.IO)
-
-                                    if (isCreatingNewPlaylist) TextFieldDialog(
-                                        hintText = stringResource(R.string.enter_playlist_name_prompt),
-                                        onDismiss = { isCreatingNewPlaylist = false },
-                                        onAccept = { text ->
-                                            menuState.hide()
-                                            addToPlaylist(Playlist(name = text), 0)
                                         }
-                                    )
-
-                                    Menu {
-                                        Row(
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier
-                                                .padding(horizontal = 24.dp, vertical = 8.dp)
-                                                .fillMaxWidth()
+                                    },
+                                    onClick = {
+                                        if (isPlayingThisMediaItem) {
+                                            if (shouldBePlaying) binder.player.pause() else binder.player.play()
+                                        } else {
+                                            binder.player.seekToDefaultPosition(window.firstPeriodIndex)
+                                            binder.player.playWhenReady = true
+                                        }
+                                    }
+                                )
+                                .draggedItem(
+                                    reorderingState = reorderingState,
+                                    index = i
+                                )
+                                .background(Color.Transparent)
+                                .let {
+                                    if (PlayerPreferences.horizontalSwipeToRemoveItem && !isPlayingThisMediaItem)
+                                        it.swipeToClose(
+                                            key = windows,
+                                            delay = 100.milliseconds,
+                                            requireUnconsumed = true
                                         ) {
-                                            BasicText(
-                                                text = stringResource(R.string.add_queue_to_playlist),
-                                                style = typography.m.semiBold,
-                                                overflow = TextOverflow.Ellipsis,
-                                                maxLines = 2,
-                                                modifier = Modifier.weight(
-                                                    weight = 2f,
-                                                    fill = false
-                                                )
-                                            )
-
-                                            Spacer(modifier = Modifier.width(8.dp))
-
-                                            SecondaryTextButton(
-                                                text = stringResource(R.string.new_playlist),
-                                                onClick = { isCreatingNewPlaylist = true },
-                                                alternative = true,
-                                                modifier = Modifier.weight(
-                                                    weight = 1f,
-                                                    fill = false
-                                                )
-                                            )
+                                            binder.player.removeMediaItem(window.firstPeriodIndex)
                                         }
+                                    else it
+                                },
+                            clip = !reorderingState.isDragging,
+                            hideExplicit = !isPlayingThisMediaItem && AppearancePreferences.hideExplicit
+                        )
+                    }
 
-                                        if (playlistPreviews?.isEmpty() == true)
-                                            Spacer(modifier = Modifier.height(160.dp))
+                    item(
+                        key = "divider",
+                        contentType = { ContentType.Divider }
+                    ) {
+                        if (visibleSuggestions.isNotEmpty()) HorizontalDivider(
+                            modifier = Modifier.padding(start = 28.dp + Dimensions.thumbnails.song)
+                        )
+                    }
 
-                                        playlistPreviews?.forEach { playlistPreview ->
-                                            MenuEntry(
-                                                icon = R.drawable.playlist,
-                                                text = playlistPreview.playlist.name,
-                                                secondaryText = pluralStringResource(
-                                                    id = R.plurals.song_count_plural,
-                                                    count = playlistPreview.songCount,
-                                                    playlistPreview.songCount
-                                                ),
-                                                onClick = {
-                                                    menuState.hide()
-                                                    addToPlaylist(
-                                                        playlistPreview.playlist,
-                                                        playlistPreview.songCount
-                                                    )
-                                                }
-                                            )
-                                        }
-                                    }
+                    items(
+                        items = visibleSuggestions,
+                        key = { "suggestion_${it.mediaId}" },
+                        contentType = { ContentType.Suggestion }
+                    ) {
+                        SongItem(
+                            song = it,
+                            thumbnailSize = Dimensions.thumbnails.song,
+                            modifier = Modifier.clickable {
+                                menuState.display {
+                                    BaseMediaItemMenu(
+                                        onDismiss = { menuState.hide() },
+                                        mediaItem = it,
+                                        onEnqueue = { binder.player.enqueue(it) },
+                                        onPlayNext = { binder.player.addNext(it) }
+                                    )
+                                }
+                            },
+                            trailingContent = {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(
+                                        space = 12.dp,
+                                        alignment = Alignment.End
+                                    )
+                                ) {
+                                    IconButton(
+                                        icon = R.drawable.play_skip_forward,
+                                        color = colorPalette.text,
+                                        onClick = {
+                                            binder.player.addNext(it)
+                                        },
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    IconButton(
+                                        icon = R.drawable.enqueue,
+                                        color = colorPalette.text,
+                                        onClick = {
+                                            binder.player.enqueue(it)
+                                        },
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
                             }
-                            .background(colorPalette.background1)
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
+                        )
+                    }
+
+                    item(
+                        key = "loading",
+                        contentType = { ContentType.Placeholder }
+                    ) {
+                        if (binder.isLoadingRadio || suggestions == null)
+                            Column(modifier = Modifier.shimmer()) {
+                                repeat(3) { index ->
+                                    SongItemPlaceholder(
+                                        thumbnailSize = Dimensions.thumbnails.song,
+                                        modifier = Modifier
+                                            .alpha(1f - index * 0.125f)
+                                            .fillMaxWidth()
+                                    )
+                                }
+                            }
+                    }
                 }
             }
         }

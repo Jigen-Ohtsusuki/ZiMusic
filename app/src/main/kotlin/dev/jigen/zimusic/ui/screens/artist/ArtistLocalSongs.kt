@@ -1,7 +1,6 @@
 package dev.jigen.zimusic.ui.screens.artist
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +18,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import dev.jigen.compose.persist.persist
+import dev.jigen.core.ui.Dimensions
+import dev.jigen.core.ui.LocalAppearance
+import dev.jigen.core.ui.utils.isLandscape
 import dev.jigen.zimusic.Database
 import dev.jigen.zimusic.LocalPlayerAwareWindowInsets
 import dev.jigen.zimusic.LocalPlayerServiceBinder
@@ -37,10 +40,6 @@ import dev.jigen.zimusic.utils.enqueue
 import dev.jigen.zimusic.utils.forcePlayAtIndex
 import dev.jigen.zimusic.utils.forcePlayFromBeginning
 import dev.jigen.zimusic.utils.playingSong
-import dev.jigen.compose.persist.persist
-import dev.jigen.core.ui.Dimensions
-import dev.jigen.core.ui.LocalAppearance
-import dev.jigen.core.ui.utils.isLandscape
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -51,7 +50,7 @@ fun ArtistLocalSongs(
     modifier: Modifier = Modifier
 ) {
     val binder = LocalPlayerServiceBinder.current
-    val (colorPalette) = LocalAppearance.current
+    val (_) = LocalAppearance.current
     val menuState = LocalMenuState.current
 
     var songs by persist<List<Song>?>("artist/$browseId/localSongs")
@@ -74,7 +73,6 @@ fun ArtistLocalSongs(
                 contentPadding = LocalPlayerAwareWindowInsets.current
                     .only(WindowInsetsSides.Vertical + WindowInsetsSides.End).asPaddingValues(),
                 modifier = Modifier
-                    .background(colorPalette.background0)
                     .fillMaxSize()
             ) {
                 item(

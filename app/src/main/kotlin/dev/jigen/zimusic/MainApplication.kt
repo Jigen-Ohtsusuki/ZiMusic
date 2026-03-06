@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.os.StrictMode
@@ -16,7 +15,6 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.LocalIndication
@@ -52,6 +50,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -66,6 +67,36 @@ import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.work.Configuration
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
+import coil3.bitmapFactoryExifOrientationStrategy
+import coil3.decode.ExifOrientationStrategy
+import coil3.disk.DiskCache
+import coil3.disk.directory
+import coil3.memory.MemoryCache
+import coil3.request.crossfade
+import coil3.util.DebugLogger
+import com.kieronquinn.monetcompat.core.MonetActivityAccessException
+import com.kieronquinn.monetcompat.core.MonetCompat
+import com.kieronquinn.monetcompat.interfaces.MonetColorsChangedListener
+import com.valentinilk.shimmer.LocalShimmerTheme
+import dev.jigen.compose.persist.LocalPersistMap
+import dev.jigen.compose.persist.PersistMap
+import dev.jigen.compose.preferences.PreferencesHolder
+import dev.jigen.core.ui.Dimensions
+import dev.jigen.core.ui.LocalAppearance
+import dev.jigen.core.ui.SystemBarAppearance
+import dev.jigen.core.ui.appearance
+import dev.jigen.core.ui.rippleConfiguration
+import dev.jigen.core.ui.shimmerTheme
+import dev.jigen.core.ui.utils.activityIntentBundle
+import dev.jigen.core.ui.utils.isAtLeastAndroid12
+import dev.jigen.core.ui.utils.songBundle
+import dev.jigen.providers.innertube.Innertube
+import dev.jigen.providers.innertube.models.bodies.BrowseBody
+import dev.jigen.providers.innertube.requests.playlistPage
+import dev.jigen.providers.innertube.requests.song
 import dev.jigen.zimusic.preferences.AppearancePreferences
 import dev.jigen.zimusic.preferences.DataPreferences
 import dev.jigen.zimusic.service.PlayerService
@@ -90,38 +121,6 @@ import dev.jigen.zimusic.utils.intent
 import dev.jigen.zimusic.utils.invokeOnReady
 import dev.jigen.zimusic.utils.setDefaultPalette
 import dev.jigen.zimusic.utils.toast
-import dev.jigen.compose.persist.LocalPersistMap
-import dev.jigen.compose.persist.PersistMap
-import dev.jigen.compose.preferences.PreferencesHolder
-import dev.jigen.core.ui.Darkness
-import dev.jigen.core.ui.Dimensions
-import dev.jigen.core.ui.LocalAppearance
-import dev.jigen.core.ui.SystemBarAppearance
-import dev.jigen.core.ui.amoled
-import dev.jigen.core.ui.appearance
-import dev.jigen.core.ui.rippleConfiguration
-import dev.jigen.core.ui.shimmerTheme
-import dev.jigen.core.ui.utils.activityIntentBundle
-import dev.jigen.core.ui.utils.isAtLeastAndroid12
-import dev.jigen.core.ui.utils.songBundle
-import dev.jigen.providers.innertube.Innertube
-import dev.jigen.providers.innertube.models.bodies.BrowseBody
-import dev.jigen.providers.innertube.requests.playlistPage
-import dev.jigen.providers.innertube.requests.song
-import coil3.ImageLoader
-import coil3.PlatformContext
-import coil3.SingletonImageLoader
-import coil3.bitmapFactoryExifOrientationStrategy
-import coil3.decode.ExifOrientationStrategy
-import coil3.disk.DiskCache
-import coil3.disk.directory
-import coil3.memory.MemoryCache
-import coil3.request.crossfade
-import coil3.util.DebugLogger
-import com.kieronquinn.monetcompat.core.MonetActivityAccessException
-import com.kieronquinn.monetcompat.core.MonetCompat
-import com.kieronquinn.monetcompat.interfaces.MonetColorsChangedListener
-import com.valentinilk.shimmer.LocalShimmerTheme
 import dev.kdrag0n.monet.theme.ColorScheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -133,7 +132,6 @@ import kotlinx.coroutines.withContext
 private const val TAG = "MainActivity"
 private val coroutineScope = CoroutineScope(Dispatchers.IO)
 
-// Viewmodel in order to avoid recreating the entire Player state (WORKAROUND)
 class MainViewModel : ViewModel() {
     var binder: PlayerService.Binder? by mutableStateOf(null)
 
@@ -151,7 +149,6 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
 
         override fun onServiceDisconnected(name: ComponentName?) {
             vm.binder = null
-            // Try to rebind, otherwise fail
             unbindService(this)
             bindService(intent<PlayerService>(), this, BIND_AUTO_CREATE)
         }
@@ -165,7 +162,6 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
         bindService(intent<PlayerService>(), serviceConnection, BIND_AUTO_CREATE)
     }
 
-    @RequiresApi(Build.VERSION_CODES.P)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -196,11 +192,9 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
         val sampleBitmap = vm.binder.collectProvidedBitmapAsState()
         val appearance = appearance(
             source = colorSource,
-            mode = colorMode,
-            darkness = darkness,
-            fontFamily = fontFamily,
             materialAccentColor = Color(monet.getAccentColor(this@MainActivity)),
             sampleBitmap = sampleBitmap,
+            fontFamily = fontFamily,
             applyFontPadding = applyFontPadding,
             thumbnailRoundness = thumbnailRoundness.dp
         )
@@ -209,7 +203,22 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
 
         BoxWithConstraints(
             modifier = Modifier
-                .background(appearance.colorPalette.background0)
+                .background(Color.Black)
+                .drawBehind {
+                    val radius = size.width.coerceAtLeast(size.height) * 0.85f
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                appearance.colorPalette.accent.copy(alpha = 0.25f),
+                                Color.Transparent
+                            ),
+                            center = Offset(size.width, 0f),
+                            radius = radius
+                        ),
+                        radius = radius,
+                        center = Offset(size.width, 0f)
+                    )
+                }
                 .then(modifier)
                 .fillMaxSize()
         ) {
@@ -229,7 +238,6 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.P)
     @Suppress("CyclomaticComplexMethod")
     @OptIn(ExperimentalLayoutApi::class)
     fun setContent() = setContent {
@@ -298,18 +306,10 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
                     )
                 }
 
-                CompositionLocalProvider(
-                    LocalAppearance provides LocalAppearance.current.let {
-                        if (it.colorPalette.isDark && AppearancePreferences.darkness == Darkness.AMOLED) {
-                            it.copy(colorPalette = it.colorPalette.amoled())
-                        } else it
-                    }
-                ) {
-                    Player(
-                        layoutState = playerBottomSheetState,
-                        modifier = Modifier.align(Alignment.BottomCenter)
-                    )
-                }
+                Player(
+                    layoutState = playerBottomSheetState,
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
 
                 BottomSheetMenu(
                     modifier = Modifier.align(Alignment.BottomCenter)

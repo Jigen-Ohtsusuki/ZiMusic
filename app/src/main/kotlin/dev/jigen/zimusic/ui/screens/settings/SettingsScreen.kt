@@ -3,7 +3,6 @@
 package dev.jigen.zimusic.ui.screens.settings
 
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +21,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -38,27 +43,20 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import dev.jigen.compose.persist.PersistMapCleanup
+import dev.jigen.compose.routing.RouteHandler
+import dev.jigen.core.ui.LocalAppearance
 import dev.jigen.zimusic.LocalPlayerAwareWindowInsets
 import dev.jigen.zimusic.R
 import dev.jigen.zimusic.ui.components.themed.Header
 import dev.jigen.zimusic.ui.components.themed.NumberFieldDialog
 import dev.jigen.zimusic.ui.components.themed.Scaffold
-import dev.jigen.zimusic.ui.components.themed.Slider
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Icon
 import dev.jigen.zimusic.ui.components.themed.ValueSelectorDialog
 import dev.jigen.zimusic.ui.screens.GlobalRoutes
 import dev.jigen.zimusic.ui.screens.Route
 import dev.jigen.zimusic.utils.color
 import dev.jigen.zimusic.utils.secondary
 import dev.jigen.zimusic.utils.semiBold
-import dev.jigen.compose.persist.PersistMapCleanup
-import dev.jigen.compose.routing.RouteHandler
-import dev.jigen.core.ui.LocalAppearance
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 
@@ -142,7 +140,7 @@ fun <T> ValueSelectorSettingsEntry(
     var isShowingDialog by remember { mutableStateOf(false) }
 
     if (isShowingDialog) ValueSelectorDialog(
-        onDismiss = { isShowingDialog = false },
+        onDismiss = { },
         title = title,
         selectedValue = selectedValue,
         values = values,
@@ -154,7 +152,7 @@ fun <T> ValueSelectorSettingsEntry(
         modifier = modifier,
         title = title,
         text = text ?: valueText(selectedValue),
-        onClick = { isShowingDialog = true },
+        onClick = { },
         isEnabled = isEnabled,
         trailingContent = trailingContent,
         usePadding = usePadding
@@ -213,45 +211,6 @@ fun SwitchSettingsEntry(
 }
 
 @Composable
-fun SliderSettingsEntry(
-    title: String,
-    text: String,
-    state: Float,
-    range: ClosedFloatingPointRange<Float>,
-    modifier: Modifier = Modifier,
-    onSlide: (Float) -> Unit = { },
-    onSlideComplete: () -> Unit = { },
-    toDisplay: @Composable (Float) -> String = { it.toString() },
-    steps: Int = 0,
-    isEnabled: Boolean = true,
-    usePadding: Boolean = true,
-    showTicks: Boolean = steps != 0
-) = Column(modifier = modifier) {
-    SettingsEntry(
-        title = title,
-        text = "$text (${toDisplay(state)})",
-        onClick = {},
-        isEnabled = isEnabled,
-        usePadding = usePadding
-    )
-
-    Slider(
-        state = state,
-        setState = onSlide,
-        onSlideComplete = onSlideComplete,
-        range = range,
-        steps = steps,
-        showTicks = showTicks,
-        modifier = Modifier
-            .height(36.dp)
-            .alpha(if (isEnabled) 1f else 0.5f)
-            .let { if (usePadding) it.padding(start = 32.dp, end = 16.dp) else it }
-            .padding(vertical = 16.dp)
-            .fillMaxWidth()
-    )
-}
-
-@Composable
 inline fun IntSettingsEntry(
     title: String,
     text: String,
@@ -266,10 +225,9 @@ inline fun IntSettingsEntry(
     var isShowingDialog by remember { mutableStateOf(false) }
 
     if (isShowingDialog) NumberFieldDialog(
-        onDismiss = { isShowingDialog = false },
+        onDismiss = { },
         onAccept = {
             setValue(it)
-            isShowingDialog = false
         },
         initialValue = currentValue,
         defaultValue = defaultValue,
@@ -281,7 +239,7 @@ inline fun IntSettingsEntry(
         modifier = modifier,
         title = title,
         text = text,
-        onClick = { isShowingDialog = true },
+        onClick = { },
         isEnabled = isEnabled,
         usePadding = usePadding
     )
@@ -370,11 +328,10 @@ fun SettingsCategoryScreen(
     scrollState: ScrollState? = rememberScrollState(),
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val (colorPalette, typography) = LocalAppearance.current
+    val (_, typography) = LocalAppearance.current
 
     Column(
         modifier = modifier
-            .background(colorPalette.background0)
             .fillMaxSize()
             .let { if (scrollState != null) it.verticalScroll(state = scrollState) else it }
             .padding(

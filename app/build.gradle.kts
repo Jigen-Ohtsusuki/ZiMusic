@@ -28,7 +28,7 @@ android {
     defaultConfig {
         applicationId = appId
 
-        minSdk = 21
+        minSdk = 31
         targetSdk = 36
 
         versionCode = System.getenv("ANDROID_VERSION_CODE")?.toIntOrNull() ?: 16

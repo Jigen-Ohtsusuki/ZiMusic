@@ -8,7 +8,6 @@ import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -19,7 +18,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import dev.jigen.zimusic.R
 import dev.jigen.zimusic.preferences.UIStatePreferences
-import dev.jigen.core.ui.LocalAppearance
 import kotlinx.collections.immutable.toImmutableList
 
 @Composable
@@ -34,12 +32,10 @@ fun Scaffold(
     tabsEditingTitle: String = stringResource(R.string.tabs),
     content: @Composable AnimatedVisibilityScope.(Int) -> Unit
 ) {
-    val (colorPalette) = LocalAppearance.current
     var hiddenTabs by UIStatePreferences.mutableTabStateOf(key)
 
     Row(
         modifier = modifier
-            .background(colorPalette.background0)
             .fillMaxSize()
     ) {
         NavigationRail(
