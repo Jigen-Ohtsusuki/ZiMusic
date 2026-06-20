@@ -412,12 +412,12 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
     }
 }
 
-context(Context)
+context(context: Context)
 @Suppress("CyclomaticComplexMethod")
 fun handleUrl(
     uri: Uri,
     binder: PlayerService.Binder?
-) {
+) = with(context) {
     val path = uri.pathSegments.firstOrNull()
     Log.d(TAG, "Opening url: $uri ($path)")
 

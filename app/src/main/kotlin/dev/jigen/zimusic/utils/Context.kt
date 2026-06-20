@@ -24,7 +24,7 @@ import dev.jigen.zimusic.BuildConfig
 import dev.jigen.core.ui.utils.isAtLeastAndroid11
 import dev.jigen.core.ui.utils.isAtLeastAndroid6
 
-inline fun <reified T> Context.intent(): Intent = Intent(this@Context, T::class.java)
+inline fun <reified T> Context.intent(): Intent = Intent(this, T::class.java)
 
 inline fun <reified T : BroadcastReceiver> Context.broadcastPendingIntent(
     requestCode: Int = 0,

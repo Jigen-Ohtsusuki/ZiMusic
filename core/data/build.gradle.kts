@@ -1,18 +1,13 @@
 plugins {
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.android.library)
 }
 
 android {
     namespace = "dev.jigen.core.data"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 21
-    }
-
-    sourceSets.all {
-        kotlin.srcDir("src/$name/kotlin")
     }
 }
 
@@ -21,10 +16,9 @@ kotlin {
 
     compilerOptions {
         freeCompilerArgs.addAll(
-            "-Xcontext-receivers",
+            "-Xcontext-parameters",
             "-Xnon-local-break-continue",
-            "-Xconsistent-data-class-copy-visibility",
-            "-Xwarning-level=CONTEXT_RECEIVERS_DEPRECATED:disabled"
+            "-Xconsistent-data-class-copy-visibility"
         )
     }
 }

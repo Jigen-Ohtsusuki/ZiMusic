@@ -82,7 +82,7 @@ import dev.jigen.providers.innertube.utils.from
 import dev.jigen.zimusic.Database
 import dev.jigen.zimusic.MainActivity
 import dev.jigen.zimusic.R
-import dev.jigen.zimusic.audio.HighResAudioProcessor
+import dev.jigen.zimusic.audio.ZiMusicAudioProcessor
 import dev.jigen.zimusic.models.Event
 import dev.jigen.zimusic.models.QueuedMediaItem
 import dev.jigen.zimusic.models.Song
@@ -260,8 +260,6 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
     private val glyphInterface by lazy { GlyphInterface(applicationContext) }
 
-    private var poiTimestamp: Long? by mutableStateOf(null)
-
     override fun onBind(intent: Intent?): AndroidBinder {
         super.onBind(intent)
         return binder
@@ -275,6 +273,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         notificationActionReceiver.register()
 
         bitmapProvider = BitmapProvider(
+            context = this,
             getBitmapSize = {
                 (512 * resources.displayMetrics.density)
                     .roundToInt()
@@ -871,31 +870,33 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         }
     )
 
-    private fun createRendersFactory() = object : DefaultRenderersFactory(this) {
-        override fun buildAudioSink(
-            context: Context,
-            enableFloatOutput: Boolean,
-            enableAudioTrackPlaybackParams: Boolean
-        ): AudioSink {
-            return DefaultAudioSink.Builder(applicationContext)
-                .setEnableFloatOutput(true)
-                .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                .setAudioOffloadSupportProvider(
-                    DefaultAudioOffloadSupportProvider(applicationContext)
-                )
-                .setAudioProcessorChain(
-                    object : DefaultAudioProcessorChain(
-                        HighResAudioProcessor()
-                    ) {
-                        override fun getAudioProcessors(): Array<out AudioProcessor> {
-                            return arrayOf(HighResAudioProcessor())
+    private fun createRendersFactory(): DefaultRenderersFactory {
+        val processor = ZiMusicAudioProcessor()
+
+        return object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(
+                context: Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean
+            ): AudioSink {
+                return DefaultAudioSink.Builder(applicationContext)
+                    .setEnableFloatOutput(true)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .setAudioOffloadSupportProvider(
+                        DefaultAudioOffloadSupportProvider(applicationContext)
+                    )
+                    .setAudioProcessorChain(
+                        object : DefaultAudioProcessorChain(processor) {
+                            override fun getAudioProcessors(): Array<out AudioProcessor> {
+                                return arrayOf(processor)   // same instance, always
+                            }
                         }
+                    )
+                    .build()
+                    .apply {
+                        if (isAtLeastAndroid10) setOffloadMode(AudioSink.OFFLOAD_MODE_DISABLED)
                     }
-                )
-                .build()
-                .apply {
-                    if (isAtLeastAndroid10) setOffloadMode(AudioSink.OFFLOAD_MODE_DISABLED)
-                }
+            }
         }
     }
 
@@ -923,8 +924,6 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             set(value) {
                 isInvincibilityEnabled = value
             }
-
-        val poiTimestamp get() = this@PlayerService.poiTimestamp
 
         fun setBitmapListener(listener: ((Bitmap?) -> Unit)?) = bitmapProvider.setListener(listener)
 

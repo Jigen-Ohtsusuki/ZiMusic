@@ -1,5 +1,3 @@
-@file:Suppress("CONTEXT_RECEIVERS_DEPRECATED")
-
 package dev.jigen.providers.innertube.models
 
 import dev.jigen.providers.innertube.Innertube
@@ -93,11 +91,11 @@ data class Context(
             private val YTCFG_REGEX = "ytcfg\\.set\\s*\\(\\s*(\\{[\\s\\S]+?\\})\\s*\\)".toRegex()
         }
 
-        context(HttpMessageBuilder)
+        context(builder: HttpMessageBuilder)
         fun apply() {
-            userAgent?.let { userAgent(it) }
+            userAgent?.let { builder.userAgent(it) }
 
-            headers {
+            builder.headers {
                 referer?.let { set("Referer", it) }
                 set("X-Youtube-Bootstrap-Logged-In", "false")
                 set("X-YouTube-Client-Name", clientId.toString())
@@ -143,7 +141,7 @@ data class Context(
         val lockedSafetyMode: Boolean = false
     )
 
-    context(HttpMessageBuilder)
+    context(builder: HttpMessageBuilder)
     fun apply() = client.apply()
 
     companion object {

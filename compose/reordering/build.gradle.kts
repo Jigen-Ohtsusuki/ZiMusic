@@ -1,12 +1,11 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
 android {
     namespace = "dev.jigen.compose.reordering"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 21
@@ -16,8 +15,7 @@ android {
         compilerOptions {
             freeCompilerArgs.addAll(
                 listOf(
-                    "-Xcontext-receivers",
-                    "-Xwarning-level=CONTEXT_RECEIVERS_DEPRECATED:disabled"
+                    "-Xcontext-parameters"
                 )
             )
         }

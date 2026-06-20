@@ -2,8 +2,6 @@ package dev.jigen.core.ui
 
 import androidx.compose.runtime.saveable.SaverScope
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.core.graphics.ColorUtils
 
 @Suppress("NOTHING_TO_INLINE")
 @JvmInline
@@ -34,7 +32,3 @@ value class Hsl(@PublishedApi internal val raw: FloatArray) {
 }
 
 val FloatArray.hsl get() = Hsl(raw = this)
-val Color.hsl
-    get() = FloatArray(3)
-        .apply { ColorUtils.colorToHSL(this@Color.toArgb(), this) }
-        .hsl

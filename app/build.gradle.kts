@@ -1,10 +1,8 @@
-import org.jetbrains.kotlin.compose.compiler.gradle.ComposeFeatureFlag
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.ksp)
@@ -23,12 +21,13 @@ android {
     val appId = "${project.group}"
 
     namespace = appId
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = appId
 
         minSdk = 31
+        //noinspection OldTargetApi
         targetSdk = 36
 
         versionCode = System.getenv("ANDROID_VERSION_CODE")?.toIntOrNull() ?: 16
@@ -109,10 +108,9 @@ kotlin {
         languageVersion.set(KotlinVersion.KOTLIN_2_2)
 
         freeCompilerArgs.addAll(
-            "-Xcontext-receivers",
+            "-Xcontext-parameters",
             "-Xnon-local-break-continue",
-            "-Xconsistent-data-class-copy-visibility",
-            "-Xwarning-level=CONTEXT_RECEIVERS_DEPRECATED:disabled"
+            "-Xconsistent-data-class-copy-visibility"
         )
     }
 }
@@ -122,10 +120,6 @@ ksp {
 }
 
 composeCompiler {
-    featureFlags = setOf(
-        ComposeFeatureFlag.OptimizeNonSkippingGroups
-    )
-
     if (project.findProperty("enableComposeCompilerReports") == "true") {
         val dest = layout.buildDirectory.dir("compose_metrics")
         metricsDestination = dest
@@ -151,6 +145,8 @@ dependencies {
     implementation(libs.compose.shimmer)
     implementation(libs.compose.lottie)
     implementation(libs.compose.material3)
+    implementation(libs.compose.icons.core)
+    implementation(libs.compose.icons.extended)
 
     implementation(libs.coil.compose)
     implementation(libs.coil.ktor)

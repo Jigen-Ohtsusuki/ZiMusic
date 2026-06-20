@@ -1,32 +1,28 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.parcelize)
 }
 
 android {
     namespace = "dev.jigen.compose.routing"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 21
-    }
-
-    kotlin {
-        compilerOptions {
-            freeCompilerArgs.addAll(
-                listOf(
-                    "-Xcontext-receivers",
-                    "-Xwarning-level=CONTEXT_RECEIVERS_DEPRECATED:disabled"
-                )
-            )
-        }
     }
 }
 
 kotlin {
     jvmToolchain(libs.versions.jvm.get().toInt())
+
+    compilerOptions {
+        freeCompilerArgs.addAll(
+            listOf(
+                "-Xcontext-parameters"
+            )
+        )
+    }
 }
 
 dependencies {

@@ -140,7 +140,7 @@ fun <T> ValueSelectorSettingsEntry(
     var isShowingDialog by remember { mutableStateOf(false) }
 
     if (isShowingDialog) ValueSelectorDialog(
-        onDismiss = { },
+        onDismiss = { isShowingDialog = false },
         title = title,
         selectedValue = selectedValue,
         values = values,
@@ -152,7 +152,7 @@ fun <T> ValueSelectorSettingsEntry(
         modifier = modifier,
         title = title,
         text = text ?: valueText(selectedValue),
-        onClick = { },
+        onClick = { isShowingDialog = true },
         isEnabled = isEnabled,
         trailingContent = trailingContent,
         usePadding = usePadding
@@ -225,7 +225,7 @@ inline fun IntSettingsEntry(
     var isShowingDialog by remember { mutableStateOf(false) }
 
     if (isShowingDialog) NumberFieldDialog(
-        onDismiss = { },
+        onDismiss = { isShowingDialog = false },
         onAccept = {
             setValue(it)
         },
@@ -239,7 +239,7 @@ inline fun IntSettingsEntry(
         modifier = modifier,
         title = title,
         text = text,
-        onClick = { },
+        onClick = { isShowingDialog = true },
         isEnabled = isEnabled,
         usePadding = usePadding
     )

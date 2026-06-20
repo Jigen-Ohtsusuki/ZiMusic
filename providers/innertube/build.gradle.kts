@@ -29,8 +29,7 @@ kotlin {
 
     compilerOptions {
         freeCompilerArgs.addAll(
-            "-Xcontext-receivers",
-            "-Xwarning-level=CONTEXT_RECEIVERS_DEPRECATED:disabled"
+            "-Xcontext-parameters"
         )
     }
 }

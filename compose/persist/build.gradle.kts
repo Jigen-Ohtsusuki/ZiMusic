@@ -1,19 +1,14 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
 android {
     namespace = "dev.jigen.compose.persist"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 21
-    }
-
-    sourceSets.all {
-        kotlin.srcDir("src/$name/kotlin")
     }
 }
 

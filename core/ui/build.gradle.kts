@@ -1,5 +1,4 @@
 plugins {
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.parcelize)
@@ -7,21 +6,10 @@ plugins {
 
 android {
     namespace = "dev.jigen.core.ui"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 21
-    }
-
-    sourceSets.all {
-        kotlin.srcDir("src/$name/kotlin")
-    }
-
-    kotlinOptions {
-        freeCompilerArgs = freeCompilerArgs + listOf(
-            "-Xcontext-receivers",
-            "-Xwarning-level=CONTEXT_RECEIVERS_DEPRECATED:disabled"
-        )
     }
 }
 
@@ -46,4 +34,9 @@ dependencies {
 
 kotlin {
     jvmToolchain(libs.versions.jvm.get().toInt())
+    compilerOptions {
+        freeCompilerArgs.addAll(
+            "-Xcontext-parameters"
+        )
+    }
 }

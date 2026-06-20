@@ -71,7 +71,7 @@ abstract class NotificationChannels {
             }
         }
 
-        context(Service)
+        context(service: Service)
         fun startForeground(
             context: Context,
             notification: NotificationCompat.Builder.() -> NotificationCompat.Builder
@@ -79,7 +79,7 @@ abstract class NotificationChannels {
             handler.post {
                 upsertChannel(context)
                 val (id, notif) = createNotification(context, notification)
-                startForeground(id, notif)
+                service.startForeground(id, notif)
             }
         }
 
@@ -104,9 +104,9 @@ abstract class NotificationChannels {
         return random
     }
 
-    context(Application)
+    context(application: Application)
     fun createAll() = handler.post {
-        mutableChannels.forEach { it.upsertChannel(this@Application) }
+        mutableChannels.forEach { it.upsertChannel(application) }
     }
 
     @OptIn(UnstableApi::class)

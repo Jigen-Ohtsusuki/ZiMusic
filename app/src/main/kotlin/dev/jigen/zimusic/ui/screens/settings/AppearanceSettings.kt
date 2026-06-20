@@ -118,25 +118,6 @@ fun AppearanceSettings() = with(AppearancePreferences) {
                 onCheckedChange = { PlayerPreferences.horizontalSwipeToClose = it }
             )
 
-            EnumValueSelectorSettingsEntry(
-                title = stringResource(R.string.seek_bar_style),
-                selectedValue = PlayerPreferences.seekBarStyle,
-                onValueSelect = { PlayerPreferences.seekBarStyle = it },
-                valueText = { it.displayName() }
-            )
-
-            AnimatedVisibility(
-                visible = PlayerPreferences.seekBarStyle == PlayerPreferences.SeekBarStyle.Wavy,
-                label = ""
-            ) {
-                EnumValueSelectorSettingsEntry(
-                    title = stringResource(R.string.seek_bar_quality),
-                    selectedValue = PlayerPreferences.wavySeekBarQuality,
-                    onValueSelect = { PlayerPreferences.wavySeekBarQuality = it },
-                    valueText = { it.displayName() }
-                )
-            }
-
             SwitchSettingsEntry(
                 title = stringResource(R.string.swipe_to_remove_item),
                 text = stringResource(R.string.swipe_to_remove_item_description),
