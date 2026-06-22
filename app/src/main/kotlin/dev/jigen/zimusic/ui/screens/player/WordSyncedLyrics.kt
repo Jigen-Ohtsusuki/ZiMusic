@@ -2,14 +2,13 @@ package dev.jigen.zimusic.ui.screens.player
 
 import android.graphics.Paint
 import android.graphics.Typeface
-import android.os.Build
 import android.text.TextPaint
-import androidx.annotation.RequiresApi
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -33,8 +32,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -50,18 +51,20 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val STRETCHED_WORD_THRESHOLD_MS = 1270L
 private const val SEEK_SYNC_DELAY_MS = 100L
 
-@RequiresApi(Build.VERSION_CODES.P)
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WordSyncedLyrics(
     manager: LyricsPlusSyncManager,
     modifier: Modifier = Modifier,
     isVisible: Boolean = true,
-    binder: PlayerService.Binder?
+    binder: PlayerService.Binder?,
+    isSelectingForShare: Boolean = false,
+    selectedTimestamps: MutableList<Long> = mutableListOf()
 ) {
     val (colorPalette, typography) = LocalAppearance.current
     val baseStyle = typography.l.center.bold
@@ -142,28 +145,74 @@ fun WordSyncedLyrics(
             val endTimeMs = line.startTimeMs + line.durationMs
             val isActiveLine = (currentPosition in line.startTimeMs..endTimeMs) || (lineIndex == currentLineIndex)
 
+            val isSelected = remember(selectedTimestamps.size) { selectedTimestamps.contains(line.startTimeMs) }
+
+            val isSelectable = remember(selectedTimestamps.size) {
+                when {
+                    isSelected -> true
+                    selectedTimestamps.size >= 6 -> false
+                    selectedTimestamps.isEmpty() -> true
+                    else -> {
+                        val selectedIndices = selectedTimestamps.mapNotNull { ts ->
+                            val idx = lyrics.indexOfFirst { it.startTimeMs == ts }
+                            if (idx >= 0) idx else null
+                        }
+                        if (selectedIndices.isEmpty()) {
+                            true
+                        } else {
+                            val minIndex = selectedIndices.minOrNull()!!
+                            val maxIndex = selectedIndices.maxOrNull()!!
+                            lineIndex == minIndex - 1 || lineIndex == maxIndex + 1
+                        }
+                    }
+                }
+            }
+
+            val animatedLineBackgroundColor by animateColorAsState(
+                targetValue = if (isSelected) colorPalette.accent.copy(alpha = 0.25f) else Color.Transparent,
+                label = "lineSelectionBackgroundColor"
+            )
+
+            val itemAlpha by animateFloatAsState(
+                targetValue = if (isSelectingForShare && !isSelectable) 0.5f else 1.0f,
+                label = "selectableAlpha"
+            )
+
             FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp, horizontal = 32.dp)
+                    .alpha(itemAlpha)
                     .clip(RoundedCornerShape(8.dp))
-                    .clickable {
-                        binder?.player?.seekTo(line.startTimeMs)
-                        coroutineScope.launch {
-                            delay(SEEK_SYNC_DELAY_MS)
-                            manager.forceSync()
+                    .background(animatedLineBackgroundColor)
+                    .clickable(
+                        enabled = !isSelectingForShare || isSelectable,
+                        onClick = {
+                            if (isSelectingForShare) {
+                                if (isSelected) {
+                                    selectedTimestamps.remove(line.startTimeMs)
+                                } else {
+                                    selectedTimestamps.add(line.startTimeMs)
+                                }
+                            } else {
+                                binder?.player?.seekTo(line.startTimeMs)
+                                coroutineScope.launch {
+                                    delay(SEEK_SYNC_DELAY_MS.milliseconds)
+                                    manager.forceSync()
+                                }
+                            }
                         }
-                    },
+                    ),
                 horizontalArrangement = Arrangement.Center
             ) {
                 line.words.forEach { word ->
                     val animatedLineColor by animateColorAsState(
-                        targetValue = if (isActiveLine) colorPalette.text else colorPalette.textDisabled,
+                        targetValue = if (isActiveLine && !isSelectingForShare) colorPalette.text else colorPalette.textDisabled,
                         animationSpec = tween(durationMillis = 300),
                         label = "lineColorAnimation"
                     )
 
-                    val textBrush = if (isActiveLine) {
+                    val textBrush = if (isActiveLine && !isSelectingForShare) {
                         val timeProgress = when {
                             currentPosition < word.startTimeMs -> 0f
                             currentPosition >= (word.startTimeMs + word.durationMs) -> 1f
@@ -197,7 +246,7 @@ fun WordSyncedLyrics(
                     }
 
                     val isStretchedWord = word.durationMs > STRETCHED_WORD_THRESHOLD_MS
-                    val isWordCurrentlyBeingSung = currentPosition in word.startTimeMs..(word.startTimeMs + word.durationMs)
+                    val isWordCurrentlyBeingSung = !isSelectingForShare && (currentPosition in word.startTimeMs..(word.startTimeMs + word.durationMs))
 
                     val glowIntensity = if (isStretchedWord && isWordCurrentlyBeingSung) {
                         val wordProgress = if (word.durationMs > 0) {

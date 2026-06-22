@@ -40,8 +40,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -376,7 +374,7 @@ fun Lyrics(
                                     currentDurationProvider()
                                 }
                                 while (duration == C.TIME_UNSET) {
-                                    delay(100)
+                                    delay(100.milliseconds)
                                     duration = withContext(Dispatchers.Main) {
                                         currentDurationProvider()
                                     }
@@ -672,7 +670,7 @@ fun Lyrics(
                     LaunchedEffect(wordSyncedManager) {
                         wordSyncedManager?.updatePosition()
                         while (isActive) {
-                            delay(UPDATE_DELAY)
+                            delay(UPDATE_DELAY.milliseconds)
                             wordSyncedManager?.updatePosition()
                         }
                     }
@@ -680,7 +678,9 @@ fun Lyrics(
                     WordSyncedLyrics(
                         manager = wordSyncedManager!!,
                         isVisible = isDisplayed,
-                        binder = binder
+                        binder = binder,
+                        isSelectingForShare = isSelectingForShare,
+                        selectedTimestamps = selectedTimestamps
                     )
                 }
 
@@ -719,7 +719,7 @@ fun Lyrics(
 
                     LaunchedEffect(Unit) {
                         while(isActive) {
-                            delay(UPDATE_DELAY)
+                            delay(UPDATE_DELAY.milliseconds)
                             synchronizedLyrics.update()
                         }
                     }
@@ -882,12 +882,8 @@ fun Lyrics(
                                             text = stringResource(R.string.share_lyrics),
                                             onClick = {
                                                 menuState.hide()
-                                                if (isWordLevelJson(text)) {
-                                                    context.toast("Sharing is not supported for word-synced lyrics yet.")
-                                                } else {
-                                                    selectedTimestamps.clear()
-                                                    isSelectingForShare = true
-                                                }
+                                                selectedTimestamps.clear()
+                                                isSelectingForShare = true
                                             }
                                         )
 
@@ -1035,13 +1031,21 @@ fun Lyrics(
             fun Buttons() {
                 suspend fun generateLyricsBitmap(): Bitmap? {
                     try {
-                        val synchronizedLyrics = synchronizedLyrics ?: return null
                         val mediaMetadata = currentMediaMetadataProvider()
                         val artworkUri = mediaMetadata.artworkUri
 
-                        val lyricsMap = synchronizedLyrics.sentences
-                        val sortedTimestamps = selectedTimestamps.sorted()
-                        val lyricsToShare = sortedTimestamps.mapNotNull { lyricsMap[it] }.joinToString("\n")
+                        val lyricsToShare = if (wordSyncedAvailable && wordSyncedManager != null) {
+                            val lines = wordSyncedManager!!.getLyrics()
+                            val sortedTimestamps = selectedTimestamps.sorted()
+                            sortedTimestamps.mapNotNull { ts ->
+                                lines.find { it.startTimeMs == ts }?.words?.joinToString("") { it.text }?.trim()
+                            }.joinToString("\n")
+                        } else {
+                            val synchronizedLyrics = synchronizedLyrics ?: return null
+                            val lyricsMap = synchronizedLyrics.sentences
+                            val sortedTimestamps = selectedTimestamps.sorted()
+                            sortedTimestamps.mapNotNull { lyricsMap[it] }.joinToString("\n")
+                        }
 
                         if (lyricsToShare.isBlank()) {
                             context.toast("Please select some lyrics to share.")
@@ -1094,30 +1098,34 @@ fun Lyrics(
                         }
                     )
 
-                    IconButton(
-                        enabled = isEnabled,
-                        onClick = {
-                            coroutineScope.launch {
-                                val bitmap = generateLyricsBitmap()
-                                if (bitmap != null) {
-                                    val mediaMetadata = currentMediaMetadataProvider()
-                                    val displayName = "${mediaMetadata.artist} - ${mediaMetadata.title}"
-                                    val success = saveBitmapToGallery(context, bitmap, displayName)
-                                    if (success) {
-                                        context.toast("Saved to Gallery")
-                                        isSelectingForShare = false
-                                        selectedTimestamps.clear()
-                                    } else {
-                                        context.toast("Failed to save image")
+                    Box(
+                        modifier = Modifier
+                            .clip(32.dp.roundedShape)
+                            .clickable(enabled = isEnabled) {
+                                coroutineScope.launch {
+                                    val bitmap = generateLyricsBitmap()
+                                    if (bitmap != null) {
+                                        val mediaMetadata = currentMediaMetadataProvider()
+                                        val displayName = "${mediaMetadata.artist} - ${mediaMetadata.title}"
+                                        val success = saveBitmapToGallery(context, bitmap, displayName)
+                                        if (success) {
+                                            context.toast("Saved to Gallery")
+                                            isSelectingForShare = false
+                                            selectedTimestamps.clear()
+                                        } else {
+                                            context.toast("Failed to save image")
+                                        }
                                     }
                                 }
                             }
-                        }
+                            .background(if (isEnabled) colorPalette.background2 else colorPalette.background2.copy(alpha = 0.5f))
+                            .padding(horizontal = 24.dp, vertical = 12.dp)
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.download),
-                            contentDescription = "Save to Gallery",
-                            tint = if (isEnabled) colorPalette.onOverlay else colorPalette.onOverlay.copy(alpha = 0.5f)
+                        BasicText(
+                            text = "Save",
+                            style = typography.s.semiBold.color(
+                                if (isEnabled) colorPalette.text else colorPalette.textDisabled
+                            )
                         )
                     }
 
@@ -1175,7 +1183,7 @@ fun LrcLibSearchDialog(
         loading = true
         error = false
 
-        delay(1000)
+        delay(1000.milliseconds)
 
         LrcLib.lyrics(
             query = query,

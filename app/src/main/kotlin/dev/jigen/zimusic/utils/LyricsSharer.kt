@@ -11,15 +11,22 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
-import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -37,9 +44,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import androidx.core.graphics.createBitmap
 import dev.jigen.core.ui.Appearance
 import dev.jigen.core.ui.LocalAppearance
 import dev.jigen.zimusic.BuildConfig
@@ -53,7 +62,6 @@ import java.io.IOException
 import java.io.OutputStream
 import kotlin.coroutines.resume
 import dev.jigen.core.ui.R as CoreUiR
-import androidx.core.graphics.createBitmap
 
 val poppinsFontFamily = FontFamily(
     Font(resId = CoreUiR.font.poppins_w300, weight = FontWeight.Light),
@@ -68,120 +76,116 @@ fun ShareCard(
     lyrics: String,
     songTitle: String,
     songArtist: String,
-    albumArtBitmap: Bitmap?
+    albumArtBitmap: Bitmap?,
+    modifier: Modifier = Modifier,
+    maxWidth: Dp = 540.dp
 ) {
-    val imageSize = 1080.dp
     val (colorPalette, _, _) = LocalAppearance.current
     val totalLyricsChars = lyrics.length
     val lyricsLinesCount = lyrics.count { it == '\n' } + 1
 
     val lyricsFontSize = when {
-        lyricsLinesCount > 8 -> 32.sp
-        totalLyricsChars > 250 -> 38.sp
-        totalLyricsChars > 150 -> 42.sp
-        else -> 48.sp
+        lyricsLinesCount > 8 -> 20.sp
+        totalLyricsChars > 250 -> 22.sp
+        totalLyricsChars > 150 -> 26.sp
+        else -> 30.sp
     }
 
-    Box(
-        modifier = Modifier
-            .size(imageSize)
+    Column(
+        modifier = modifier
+            .width(IntrinsicSize.Max)
+            .widthIn(min = 280.dp, max = maxWidth)
+            .wrapContentHeight()
             .background(
-                Brush.verticalGradient(
+                brush = Brush.verticalGradient(
                     colors = listOf(
                         colorPalette.background1,
                         colorPalette.background0
                     )
-                )
+                ),
+                shape = RoundedCornerShape(28.dp)
             )
+            .clip(RoundedCornerShape(28.dp))
+            .padding(all = 28.dp),
+        horizontalAlignment = Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(all = 56.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(vertical = 24.dp),
-                horizontalAlignment = Alignment.Start,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                lyrics.split('\n').forEach { line ->
-                    if (line.isNotBlank()) {
-                        Text(
-                            text = line,
-                            color = colorPalette.text,
-                            fontSize = lyricsFontSize,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = poppinsFontFamily,
-                            textAlign = TextAlign.Start,
-                            overflow = TextOverflow.Visible,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+            lyrics.split('\n').forEach { line ->
+                if (line.isNotBlank()) {
+                    Text(
+                        text = line,
+                        color = colorPalette.text,
+                        fontSize = lyricsFontSize,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = poppinsFontFamily,
+                        textAlign = TextAlign.Start,
+                        overflow = TextOverflow.Visible,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
+        }
 
-            Column(
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.Start, // Align song details block to the left
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(), // Use full width for alignment
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(24.dp)
-                ) {
-                    if (albumArtBitmap != null) {
-                        Image(
-                            bitmap = albumArtBitmap.asImageBitmap(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(80.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                        )
-                    }
-
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.Start
-                    ) {
-                        Text(
-                            text = songTitle,
-                            color = colorPalette.text,
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = poppinsFontFamily,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-
-                        Text(
-                            text = songArtist,
-                            color = colorPalette.textSecondary,
-                            fontSize = 20.sp,
-                            fontFamily = poppinsFontFamily,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                if (albumArtBitmap != null) {
+                    Image(
+                        bitmap = albumArtBitmap.asImageBitmap(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
                 }
 
-                Text(
-                    text = "Shared from ZiMusic",
-                    color = colorPalette.textDisabled,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = poppinsFontFamily,
-                    textAlign = TextAlign.Start, // Align watermark text to the left
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        text = songTitle,
+                        color = colorPalette.text,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = poppinsFontFamily,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Text(
+                        text = songArtist,
+                        color = colorPalette.textSecondary,
+                        fontSize = 13.sp,
+                        fontFamily = poppinsFontFamily,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
+
+            Text(
+                text = "Shared from ZiMusic",
+                color = colorPalette.textDisabled,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = poppinsFontFamily,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
@@ -201,25 +205,44 @@ suspend fun captureComposableAsBitmap(
     val requiredDensity = targetSizePx / designSizeDp.value
 
     val composeView = ComposeView(context).apply {
-        setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+        setBackgroundColor(android.graphics.Color.TRANSPARENT)
         setContent {
             CompositionLocalProvider(
                 LocalAppearance provides appearance,
                 LocalDensity provides Density(density = requiredDensity, fontScale = LocalDensity.current.fontScale)
             ) {
-                content()
+                Box(modifier = Modifier.background(androidx.compose.ui.graphics.Color.Transparent)) {
+                    content()
+                }
             }
         }
+    }
+
+    val unconstrainedContainer = object : android.widget.FrameLayout(context) {
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val widthSpec = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+            val heightSpec = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+            super.onMeasure(widthSpec, heightSpec)
+        }
+    }.apply {
+        setBackgroundColor(android.graphics.Color.TRANSPARENT)
         alpha = 0f
+        addView(
+            composeView,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
     }
 
     try {
         withContext(Dispatchers.Main) {
             decorView.addView(
-                composeView,
+                unconstrainedContainer,
                 ViewGroup.LayoutParams(
-                    targetSizePx,
-                    targetSizePx
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
                 )
             )
         }
@@ -238,14 +261,15 @@ suspend fun captureComposableAsBitmap(
             }
         }
 
-        val bitmap = createBitmap(targetSizePx, targetSizePx)
+        val bitmap = createBitmap(composeView.width, composeView.height)
         val canvas = android.graphics.Canvas(bitmap)
+        canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
         composeView.draw(canvas)
         return bitmap
 
     } finally {
         withContext(Dispatchers.Main) {
-            decorView.removeView(composeView)
+            decorView.removeView(unconstrainedContainer)
         }
     }
 }
@@ -267,19 +291,14 @@ suspend fun saveBitmapToCache(context: Context, bitmap: Bitmap): Uri = withConte
 }
 
 suspend fun saveBitmapToGallery(context: Context, bitmap: Bitmap, displayName: String): Boolean = withContext(Dispatchers.IO) {
-    val imageCollection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+    val imageCollection =
         MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-    } else {
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-    }
 
     val contentValues = ContentValues().apply {
         put(MediaStore.Images.Media.DISPLAY_NAME, "$displayName.png")
         put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/ZiMusic")
-            put(MediaStore.Images.Media.IS_PENDING, 1)
-        }
+        put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/ZiMusic")
+        put(MediaStore.Images.Media.IS_PENDING, 1)
     }
 
     val resolver = context.contentResolver
@@ -294,13 +313,11 @@ suspend fun saveBitmapToGallery(context: Context, bitmap: Bitmap, displayName: S
                 }
             } ?: throw IOException("Failed to get output stream.")
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                contentValues.clear()
-                contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
-                resolver.update(it, contentValues, null, null)
-            }
+            contentValues.clear()
+            contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
+            resolver.update(it, contentValues, null, null)
             return@withContext true
-        } ?: throw IOException("Failed to create new MediaStore record.")
+        } ; throw IOException("Failed to create new MediaStore record.")
     } catch (e: Exception) {
         Log.e("SaveToGallery", "Failed to save image", e)
         uri?.let { orphanUri ->
