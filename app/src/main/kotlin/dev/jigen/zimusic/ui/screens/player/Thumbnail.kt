@@ -39,17 +39,16 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
+import coil3.compose.AsyncImage
+import dev.jigen.core.ui.LocalAppearance
+import dev.jigen.core.ui.utils.px
 import dev.jigen.zimusic.LocalPlayerServiceBinder
 import dev.jigen.zimusic.R
 import dev.jigen.zimusic.ui.modifiers.onSwipe
 import dev.jigen.zimusic.utils.forceSeekToNext
 import dev.jigen.zimusic.utils.forceSeekToPrevious
-import dev.jigen.zimusic.utils.thumbnail
 import dev.jigen.zimusic.utils.windowState
-import dev.jigen.core.ui.Dimensions
-import dev.jigen.core.ui.LocalAppearance
-import dev.jigen.core.ui.utils.px
-import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 
 @Composable
@@ -136,8 +135,12 @@ fun Thumbnail(
                 )
         ) {
             AsyncImage(
-                model = currentWindow.mediaItem.mediaMetadata.artworkUri
-                    ?.thumbnail((Dimensions.thumbnails.player.song - 64.dp).px),
+                model = currentWindow.mediaItem.mediaMetadata.artworkUri?.let {
+                    val originalUrl = it.toString()
+                    if (originalUrl.contains("=w")) {
+                        originalUrl.replace(Regex("=w\\d+-h\\d+"), "=w1080-h1080").toUri()
+                    } else it
+                },
                 placeholder = painterResource(id = R.drawable.ic_launcher_foreground),
                 error = painterResource(id = R.drawable.ic_launcher_foreground),
                 contentDescription = null,
