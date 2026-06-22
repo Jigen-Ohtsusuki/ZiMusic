@@ -146,6 +146,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.io.IOException
 import kotlin.math.roundToInt
 import kotlin.time.Clock
@@ -169,7 +170,11 @@ private const val LOOP_ACTION = "LOOP"
 internal val PlayerResponse.StreamingData.highestQualityFormat: PlayerResponse.StreamingData.Format?
     get() = (adaptiveFormats + formats.orEmpty())
         .filter { it.isAudio }
-        .maxByOrNull { it.bitrate }
+        .maxWithOrNull(
+            compareBy<PlayerResponse.StreamingData.Format> { it.itag == 251 }
+                .thenBy { it.averageBitrate ?: it.bitrate }
+                .thenBy { it.mimeType.contains("webm") }
+        )
 
 internal fun PlayerResponse.StreamingData.Format.findUrl(videoId: String): String? {
     return NewPipeUtils.getStreamUrl(this, videoId).getOrNull()
@@ -849,13 +854,13 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
     private fun updateNotification() = runCatching {
         handler.post {
-            notification()?.let { ServiceNotifications.default.sendNotification(this, it) }
+            notification()?.let { ServiceNotifications.default.sendNotification(this, notification = it) }
         }
     }
 
     override fun startForeground() {
         notification()
-            ?.let { ServiceNotifications.default.startForeground(this, it) }
+            ?.let { ServiceNotifications.default.startForeground(this, notification = it) }
     }
 
     private fun createMediaSourceFactory() = DefaultMediaSourceFactory(
@@ -1003,9 +1008,6 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             radio = null
         }
 
-        /**
-         * This method should ONLY be called when the application (sc. activity) is in the foreground!
-         */
         fun restartForegroundOrStop() {
             player.pause()
             isInvincibilityEnabled = false
@@ -1140,6 +1142,13 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         ) { dataSpec ->
             val requestedMediaId = dataSpec.key?.removePrefix("https://youtube.com/watch?v=")
                 ?: error("A key must be set")
+
+            val downloadedFile = File(context.filesDir, "downloads/$requestedMediaId.zdl")
+            if (downloadedFile.exists()) {
+                return@Factory dataSpec.buildUpon()
+                    .setUri(downloadedFile.toUri())
+                    .build()
+            }
 
             fun DataSpec.ranged(contentLength: Long?) = contentLength?.let {
                 if (chunkLength == null) return@let null

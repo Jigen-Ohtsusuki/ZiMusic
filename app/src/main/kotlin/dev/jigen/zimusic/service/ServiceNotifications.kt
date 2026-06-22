@@ -41,11 +41,13 @@ abstract class NotificationChannels {
 
         private fun createNotification(
             context: Context,
+            notificationId: Int? = null,
+            onlyAlertOnce: Boolean = true,
             notification: NotificationCompat.Builder.() -> NotificationCompat.Builder
         ): Pair<Int, Notification> =
-            (notificationId ?: randomNotificationId()) to NotificationCompat.Builder(context, id)
+            (notificationId ?: this.notificationId ?: randomNotificationId()) to NotificationCompat.Builder(context, id)
                 .let {
-                    if (notificationId == null) it else it.setOnlyAlertOnce(false)
+                    if (this.notificationId == null && notificationId == null) it else it.setOnlyAlertOnce(onlyAlertOnce)
                 }
                 .run(notification)
                 .build()
@@ -61,12 +63,14 @@ abstract class NotificationChannels {
 
         fun sendNotification(
             context: Context,
+            notificationId: Int? = null,
+            onlyAlertOnce: Boolean = true,
             notification: NotificationCompat.Builder.() -> NotificationCompat.Builder
         ) = runCatching {
             handler.post {
                 val manager = context.notificationManager
                 upsertChannel(context)
-                val (id, notif) = createNotification(context, notification)
+                val (id, notif) = createNotification(context, notificationId, onlyAlertOnce, notification)
                 manager.notify(id, notif)
             }
         }
@@ -74,12 +78,18 @@ abstract class NotificationChannels {
         context(service: Service)
         fun startForeground(
             context: Context,
+            notificationId: Int? = null,
+            foregroundServiceType: Int = 0,
             notification: NotificationCompat.Builder.() -> NotificationCompat.Builder
         ) = runCatching {
             handler.post {
                 upsertChannel(context)
-                val (id, notif) = createNotification(context, notification)
-                service.startForeground(id, notif)
+                val (id, notif) = createNotification(context, notificationId, true, notification)
+                if (foregroundServiceType != 0 && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    service.startForeground(id, notif, foregroundServiceType)
+                } else {
+                    service.startForeground(id, notif)
+                }
             }
         }
 
@@ -158,8 +168,8 @@ object ServiceNotifications : NotificationChannels() {
 
     val download by channel(
         description = R.string.pre_cache,
-        importance = NotificationManagerCompat.IMPORTANCE_LOW,
-        singleNotification = true
+        importance = NotificationManagerCompat.IMPORTANCE_DEFAULT,
+        singleNotification = false
     )
 
     val version by channel(

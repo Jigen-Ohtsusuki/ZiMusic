@@ -69,7 +69,6 @@ import kotlinx.coroutines.flow.cancellable
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
 
 private enum class SwipeState {
     Covered,
@@ -98,15 +97,10 @@ fun BuiltInPlaylistSongs(
                 sortOrder = sortOrder
             )
 
-            BuiltInPlaylist.Offline ->
-                Database.instance
-                    .songsWithContentLength(
-                        sortBy = sortBy,
-                        sortOrder = sortOrder
-                    )
-                    .map { songs ->
-                        songs.filter { binder?.isCached(it) ?: false }.map { it.song }
-                    }
+            BuiltInPlaylist.Offline -> Database.instance.downloadedSongs(
+                sortBy = sortBy,
+                sortOrder = sortOrder
+            )
 
             BuiltInPlaylist.Top -> combine(
                 flow = topListPeriodProperty.stateFlow,

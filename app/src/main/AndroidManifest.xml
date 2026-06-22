@@ -44,7 +44,6 @@
 
     <application
         android:name="dev.jigen.zimusic.MainApplication"
-        android:allowBackup="true"
         android:banner="@mipmap/ic_banner"
         android:configChanges="colorMode|density|fontScale|keyboard|keyboardHidden|layoutDirection|locale|mcc|mnc|navigation|orientation|screenLayout|screenSize|smallestScreenSize|touchscreen|uiMode"
         android:enableOnBackInvokedCallback="true"
@@ -68,9 +67,7 @@
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <action android:name="android.intent.action.MUSIC_PLAYER" /> <!-- Not a real action, but apparently some apps query for this -->
-
-                <category android:name="android.intent.category.DEFAULT" />
+                <action android:name="android.intent.action.MUSIC_PLAYER" /> <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.APP_MUSIC" />
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
@@ -259,5 +256,11 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </service>
+
+        <service
+            android:name="dev.jigen.zimusic.service.ZiDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
     </application>
 </manifest>

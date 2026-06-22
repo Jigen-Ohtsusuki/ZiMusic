@@ -274,7 +274,7 @@ fun LocalPlaylistSongs(
                                     menuState.display {
                                         Menu {
                                             MenuEntry(
-                                                icon = R.drawable.download,
+                                                icon = R.drawable.precache,
                                                 text = stringResource(R.string.pre_cache),
                                                 onClick = {
                                                     menuState.hide()
@@ -283,6 +283,18 @@ fun LocalPlaylistSongs(
                                                     }
                                                 }
                                             )
+
+                                            MenuEntry(
+                                                icon = R.drawable.download,
+                                                text = stringResource(R.string.download),
+                                                onClick = {
+                                                    menuState.hide()
+                                                    filteredSongs.forEach { song ->
+                                                        dev.jigen.zimusic.service.ZiDownloadService.scheduleDownload(context, song.asMediaItem, playlist.name)
+                                                    }
+                                                }
+                                            )
+
                                             playlist.browseId?.let { browseId ->
                                                 MenuEntry(
                                                     icon = R.drawable.sync,

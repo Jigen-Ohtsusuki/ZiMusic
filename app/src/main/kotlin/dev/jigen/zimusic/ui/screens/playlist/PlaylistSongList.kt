@@ -163,7 +163,7 @@ fun PlaylistSongList(
             Spacer(modifier = Modifier.weight(1f))
 
             playlistPage?.songsPage?.items?.map(Innertube.SongItem::asMediaItem)
-                ?.let { PlaylistDownloadIcon(songs = it.toImmutableList()) }
+                ?.let { PlaylistDownloadIcon(songs = it.toImmutableList(), parentName = playlistPage?.title) }
 
             HeaderIconButton(
                 icon = R.drawable.add,

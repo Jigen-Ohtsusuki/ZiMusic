@@ -149,6 +149,49 @@ interface Database {
         }
     }
 
+    @Query("UPDATE Song SET isDownloaded = 1, downloadPath = :path WHERE id = :songId")
+    fun markAsDownloaded(songId: String, path: String)
+
+    @Transaction
+    @Query("SELECT * FROM Song WHERE isDownloaded = 1 ORDER BY ROWID ASC")
+    fun downloadedSongsByRowIdAsc(): Flow<List<Song>>
+
+    @Transaction
+    @Query("SELECT * FROM Song WHERE isDownloaded = 1 ORDER BY ROWID DESC")
+    fun downloadedSongsByRowIdDesc(): Flow<List<Song>>
+
+    @Transaction
+    @Query("SELECT * FROM Song WHERE isDownloaded = 1 ORDER BY title COLLATE NOCASE ASC")
+    fun downloadedSongsByTitleAsc(): Flow<List<Song>>
+
+    @Transaction
+    @Query("SELECT * FROM Song WHERE isDownloaded = 1 ORDER BY title COLLATE NOCASE DESC")
+    fun downloadedSongsByTitleDesc(): Flow<List<Song>>
+
+    @Transaction
+    @Query("SELECT * FROM Song WHERE isDownloaded = 1 ORDER BY totalPlayTimeMs ASC")
+    fun downloadedSongsByPlayTimeAsc(): Flow<List<Song>>
+
+    @Transaction
+    @Query("SELECT * FROM Song WHERE isDownloaded = 1 ORDER BY totalPlayTimeMs DESC")
+    fun downloadedSongsByPlayTimeDesc(): Flow<List<Song>>
+
+    fun downloadedSongs(sortBy: SongSortBy, sortOrder: SortOrder) = when (sortBy) {
+        SongSortBy.PlayTime -> when (sortOrder) {
+            SortOrder.Ascending -> downloadedSongsByPlayTimeAsc()
+            SortOrder.Descending -> downloadedSongsByPlayTimeDesc()
+        }
+        SongSortBy.Title -> when (sortOrder) {
+            SortOrder.Ascending -> downloadedSongsByTitleAsc()
+            SortOrder.Descending -> downloadedSongsByTitleDesc()
+        }
+        SongSortBy.Position,
+        SongSortBy.DateAdded -> when (sortOrder) {
+            SortOrder.Ascending -> downloadedSongsByRowIdAsc()
+            SortOrder.Descending -> downloadedSongsByRowIdDesc()
+        }
+    }
+
     @Transaction
     @Query("SELECT * FROM Song WHERE likedAt IS NOT NULL ORDER BY totalPlayTimeMs ASC")
     fun favoritesByPlayTimeAsc(): Flow<List<Song>>
@@ -232,8 +275,8 @@ interface Database {
     @Query("SELECT likedAt FROM Song WHERE id = :songId")
     fun likedAt(songId: String): Flow<Long?>
 
-    @Query("SELECT likedAt FROM Song WHERE id = :songId")
-    fun getLikedAtSync(songId: String): Long?
+    @Query("SELECT * FROM Song WHERE id = :id")
+    fun songSync(id: String): Song?
 
     @Query("UPDATE Song SET likedAt = :likedAt WHERE id = :songId")
     fun like(songId: String, likedAt: Long?): Int
@@ -734,17 +777,23 @@ interface Database {
 
     @Transaction
     fun insert(mediaItem: MediaItem, block: (Song) -> Song = { it }) {
-        val existingLikedAt = getLikedAtSync(mediaItem.mediaId)
-
         val extras = mediaItem.mediaMetadata.extras?.songBundle
+        val existingSong = songSync(mediaItem.mediaId)
+
         val song = Song(
             id = mediaItem.mediaId,
             title = mediaItem.mediaMetadata.title?.toString().orEmpty(),
             artistsText = mediaItem.mediaMetadata.artist?.toString(),
-            durationText = extras?.durationText,
-            thumbnailUrl = mediaItem.mediaMetadata.artworkUri?.toString(),
+            durationText = extras?.durationText ?: existingSong?.durationText,
+            thumbnailUrl = mediaItem.mediaMetadata.artworkUri?.toString() ?: existingSong?.thumbnailUrl,
+            album = mediaItem.mediaMetadata.albumTitle?.toString() ?: existingSong?.album,
+            likedAt = existingSong?.likedAt,
+            totalPlayTimeMs = existingSong?.totalPlayTimeMs ?: 0,
+            loudnessBoost = existingSong?.loudnessBoost,
+            blacklisted = existingSong?.blacklisted ?: false,
             explicit = extras?.explicit == true,
-            likedAt = existingLikedAt
+            isDownloaded = existingSong?.isDownloaded ?: false,
+            downloadPath = existingSong?.downloadPath
         ).let(block)
 
         upsert(song)

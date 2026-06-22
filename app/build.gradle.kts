@@ -109,7 +109,6 @@ kotlin {
 
         freeCompilerArgs.addAll(
             "-Xcontext-parameters",
-            "-Xnon-local-break-continue",
             "-Xconsistent-data-class-copy-visibility"
         )
     }

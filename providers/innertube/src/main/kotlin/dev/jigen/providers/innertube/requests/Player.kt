@@ -40,7 +40,11 @@ private val PlayerResponse.isValid
 private val PlayerResponse.StreamingData.highestQualityFormat: PlayerResponse.StreamingData.Format?
     get() = (adaptiveFormats + formats.orEmpty())
         .filter { it.isAudio }
-        .maxByOrNull { it.bitrate }
+        .maxWithOrNull(
+            compareBy<PlayerResponse.StreamingData.Format> { it.itag == 251 }
+                .thenBy { it.averageBitrate ?: it.bitrate }
+                .thenBy { it.mimeType.contains("webm") }
+        )
 
 private fun validateStreamUrl(url: String): Boolean {
     return try {

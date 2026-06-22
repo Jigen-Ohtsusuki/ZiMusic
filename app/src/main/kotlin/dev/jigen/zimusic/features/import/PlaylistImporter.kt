@@ -1,17 +1,18 @@
 package dev.jigen.zimusic.features.import
 
 import android.util.Log
-import dev.jigen.zimusic.Database
-import dev.jigen.zimusic.models.Playlist
-import dev.jigen.zimusic.models.Song
-import dev.jigen.zimusic.models.SongPlaylistMap
-import dev.jigen.zimusic.models.Artist
-import dev.jigen.zimusic.models.SongArtistMap
-import dev.jigen.zimusic.transaction
+import androidx.core.net.toUri
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import dev.jigen.core.ui.utils.SongBundleAccessor
 import dev.jigen.providers.innertube.Innertube
 import dev.jigen.providers.innertube.models.bodies.SearchBody
 import dev.jigen.providers.innertube.requests.searchPage
 import dev.jigen.providers.innertube.utils.from
+import dev.jigen.zimusic.Database
+import dev.jigen.zimusic.models.Playlist
+import dev.jigen.zimusic.models.SongPlaylistMap
+import dev.jigen.zimusic.transaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -65,7 +66,7 @@ class PlaylistImporter {
         try {
             val reversedSongList = songList.reversed()
             val totalTracks = reversedSongList.size
-            val songsToAdd = mutableListOf<Pair<Song, List<Innertube.Info<dev.jigen.providers.innertube.models.NavigationEndpoint.Endpoint.Browse>>>>()
+            val songsToAdd = mutableListOf<MediaItem>()
             val failedTracks = mutableListOf<SongImportInfo>()
             var processedCount = 0
 
@@ -92,20 +93,12 @@ class PlaylistImporter {
                             val bestMatch = findBestMatchInResults(track, searchCandidates)
                             bestMatch?.let {
                                 // Extract artist information with IDs
-                                val artistsWithEndpoints = it.authors?.let { authors ->
-                                    val itemsWithEndpoints = authors.filter { author ->
-                                        val name = author.name?.trim() ?: ""
-                                        author.endpoint != null &&
-                                            name.isNotEmpty() &&
-                                            name != " • " &&
-                                            !name.contains(":")
-                                    }
-
-                                    if (itemsWithEndpoints.size > 1) {
-                                        itemsWithEndpoints.dropLast(1)
-                                    } else {
-                                        itemsWithEndpoints
-                                    }
+                                val artistsWithEndpoints = it.authors?.filter { author ->
+                                    val name = author.name?.trim() ?: ""
+                                    author.endpoint != null &&
+                                        name.isNotEmpty() &&
+                                        name != " • " &&
+                                        !name.contains(":")
                                 } ?: emptyList()
 
                                 val artistsText = when (artistsWithEndpoints.size) {
@@ -119,23 +112,33 @@ class PlaylistImporter {
                                     }
                                 }
 
-                                Song(
-                                    id = it.info?.endpoint?.videoId ?: "",
-                                    title = it.info?.name ?: "",
-                                    artistsText = artistsText,
-                                    durationText = it.durationText,
-                                    thumbnailUrl = it.thumbnail?.url,
-                                    album = it.album?.name
-                                ) to artistsWithEndpoints
+                                MediaItem.Builder()
+                                    .setMediaId(it.info?.endpoint?.videoId ?: "")
+                                    .setMediaMetadata(
+                                        MediaMetadata.Builder()
+                                            .setTitle(it.info?.name ?: "")
+                                            .setArtist(artistsText)
+                                            .setAlbumTitle(it.album?.name)
+                                            .setArtworkUri(it.thumbnail?.url?.toUri())
+                                            .setExtras(
+                                                SongBundleAccessor.bundle {
+                                                    albumId = it.album?.endpoint?.browseId
+                                                    durationText = it.durationText
+                                                    artistNames = artistsWithEndpoints.map { it.name.toString() }
+                                                    artistIds = artistsWithEndpoints.mapNotNull { it.endpoint?.browseId }
+                                                }
+                                            )
+                                            .build()
+                                    )
+                                    .build()
                             }
                         }
                     }
                     val results = deferredSongsInBatch.awaitAll()
                     batch.zip(results).forEach { (originalTrack, result) ->
                         if (result != null) {
-                            val (song, artistsWithEndpoints) = result
-                            if (song.id.isNotBlank()) {
-                                songsToAdd.add(song to artistsWithEndpoints)
+                            if (result.mediaId.isNotBlank()) {
+                                songsToAdd.add(result)
                             } else {
                                 failedTracks.add(originalTrack)
                             }
@@ -154,33 +157,12 @@ class PlaylistImporter {
                     val newPlaylist = Playlist(name = playlistName)
                     val newPlaylistId = Database.instance.insert(newPlaylist)
                     if (newPlaylistId != -1L) {
-                        songsToAdd.forEachIndexed { index, (song, artistsWithEndpoints) ->
-                            // Use upsert to handle duplicates without crashing
-                            Database.instance.upsert(song)
-
-                            artistsWithEndpoints.forEach { artistInfo ->
-                                val artistId = artistInfo.endpoint?.browseId
-                                val artistName = artistInfo.name
-                                if (artistId != null && artistName != null) {
-                                    Database.instance.upsert(
-                                        Artist(
-                                            id = artistId,
-                                            name = artistName
-                                        )
-                                    )
-                                    // Use upsert to handle duplicate song-artist relationships
-                                    Database.instance.upsert(
-                                        SongArtistMap(
-                                            songId = song.id,
-                                            artistId = artistId
-                                        )
-                                    )
-                                }
-                            }
+                        songsToAdd.forEachIndexed { index, mediaItem ->
+                            Database.instance.insert(mediaItem)
 
                             Database.instance.insert(
                                 SongPlaylistMap(
-                                    songId = song.id,
+                                    songId = mediaItem.mediaId,
                                     playlistId = newPlaylistId,
                                     position = index
                                 )

@@ -211,7 +211,7 @@ class PrecacheService : DownloadService(
             /* context = */ this,
             /* notification = */ downloadNotificationHelper.buildProgressNotification(
                 /* context            = */ this,
-                /* smallIcon          = */ R.drawable.download,
+                /* smallIcon          = */ R.drawable.precache,
                 /* contentIntent      = */ null,
                 /* message            = */ null,
                 /* downloads          = */ downloads,

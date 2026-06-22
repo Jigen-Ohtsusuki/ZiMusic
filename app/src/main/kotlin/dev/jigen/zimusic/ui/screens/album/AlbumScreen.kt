@@ -208,7 +208,8 @@ fun AlbumScreen(browseId: String) {
                             afterHeaderContent = {
                                 if (album == null) PlaylistInfo(playlist = albumPage)
                                 else PlaylistInfo(playlist = album)
-                            }
+                            },
+                            parentName = album?.title
                         )
 
                         1 -> {

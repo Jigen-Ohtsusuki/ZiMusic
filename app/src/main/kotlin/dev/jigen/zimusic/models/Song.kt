@@ -20,7 +20,10 @@ data class Song(
     @ColumnInfo(defaultValue = "false")
     val blacklisted: Boolean = false,
     @ColumnInfo(defaultValue = "false")
-    val explicit: Boolean = false
+    val explicit: Boolean = false,
+    @ColumnInfo(defaultValue = "false")
+    val isDownloaded: Boolean = false,
+    val downloadPath: String? = null
 ) {
     fun toggleLike() = copy(likedAt = if (likedAt == null) System.currentTimeMillis() else null)
 }

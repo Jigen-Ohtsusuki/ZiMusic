@@ -211,7 +211,7 @@ class PlayerMediaBrowserService : MediaBrowserService(), ServiceConnection {
             BrowserMediaDescription.Builder()
                 .setMediaId(MediaId.LOCAL.id)
                 .setTitle(getString(R.string.local))
-                .setIconUri(uriFor(R.drawable.download))
+                .setIconUri(uriFor(R.drawable.precache))
                 .build(),
             BrowserMediaItem.FLAG_PLAYABLE
         )

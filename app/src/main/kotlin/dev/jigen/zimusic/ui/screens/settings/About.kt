@@ -113,7 +113,7 @@ class VersionCheckWorker(
         result?.getOrNull()?.let { release ->
             ServiceNotifications.version.sendNotification(applicationContext) {
                 this
-                    .setSmallIcon(R.drawable.download)
+                    .setSmallIcon(R.drawable.precache)
                     .setContentTitle(getString(R.string.new_version_available))
                     .setContentText(getString(R.string.redirect_github))
                     .setContentIntent(

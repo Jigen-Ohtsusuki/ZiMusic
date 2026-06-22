@@ -72,7 +72,7 @@ fun HomeScreen() {
                     tab(3, R.string.playlists, R.drawable.playlist)
                     tab(4, R.string.artists, R.drawable.person)
                     tab(5, R.string.albums, R.drawable.disc)
-                    tab(6, R.string.local, R.drawable.download)
+                    tab(6, R.string.local, R.drawable.precache)
                 }
             ) { currentTabIndex ->
                 saveableStateHolder.SaveableStateProvider(key = currentTabIndex) {

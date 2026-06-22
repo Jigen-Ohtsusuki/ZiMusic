@@ -965,7 +965,7 @@ fun Lyrics(
 
                                         if (shouldShowSynchronizedLyrics) {
                                             MenuEntry(
-                                                icon = R.drawable.download,
+                                                icon = R.drawable.precache,
                                                 text = stringResource(R.string.pick_from_lrclib),
                                                 onClick = {
                                                     menuState.hide()

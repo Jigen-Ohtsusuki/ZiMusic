@@ -50,7 +50,8 @@ fun AlbumSongs(
     ) -> Unit,
     thumbnailContent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
-    afterHeaderContent: (@Composable () -> Unit)? = null
+    afterHeaderContent: (@Composable () -> Unit)? = null,
+    parentName: String? = null
 ) = LayoutWithAdaptiveThumbnail(
     thumbnailContent = thumbnailContent,
     modifier = modifier
@@ -88,7 +89,8 @@ fun AlbumSongs(
                         },
                         {
                             PlaylistDownloadIcon(
-                                songs = songs.map(Song::asMediaItem).toImmutableList()
+                                songs = songs.map(Song::asMediaItem).toImmutableList(),
+                                parentName = parentName
                             )
                         }
                     )

@@ -599,7 +599,7 @@ fun MediaItemMenu(
 
                             Box(contentAlignment = Alignment.Center) {
                                 BasicText(
-                                    text = "88h 88m", // invisible placeholder, no need to localize
+                                    text = "88h 88m",
                                     style = typography.s.semiBold,
                                     modifier = Modifier.alpha(0f)
                                 )
@@ -745,12 +745,26 @@ fun MediaItemMenu(
             )
 
             if (!isLocal && !isCached(mediaItem.mediaId)) MenuEntry(
-                icon = R.drawable.download,
+                icon = R.drawable.precache,
                 text = stringResource(R.string.pre_cache),
                 onClick = {
                     onDismiss()
                     runCatching {
                         PrecacheService.scheduleCache(
+                            context = context.applicationContext,
+                            mediaItem = mediaItem
+                        )
+                    }.exceptionOrNull()?.printStackTrace()
+                }
+            )
+
+            if (!isLocal) MenuEntry(
+                icon = R.drawable.download,
+                text = stringResource(R.string.download),
+                onClick = {
+                    onDismiss()
+                    runCatching {
+                        dev.jigen.zimusic.service.ZiDownloadService.scheduleDownload(
                             context = context.applicationContext,
                             mediaItem = mediaItem
                         )

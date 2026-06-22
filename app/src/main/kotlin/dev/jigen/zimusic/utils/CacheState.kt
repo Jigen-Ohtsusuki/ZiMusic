@@ -30,8 +30,8 @@ import dev.jigen.zimusic.R
 import dev.jigen.zimusic.models.Format
 import dev.jigen.zimusic.service.LOCAL_KEY_PREFIX
 import dev.jigen.zimusic.service.PlayerService
-import dev.jigen.zimusic.service.PrecacheService
-import dev.jigen.zimusic.service.downloadState
+import dev.jigen.zimusic.service.ZiDownloadService
+import dev.jigen.zimusic.service.ziDownloadState
 import dev.jigen.zimusic.ui.components.themed.CircularProgressIndicator
 import dev.jigen.zimusic.ui.components.themed.HeaderIconButton
 import dev.jigen.core.ui.LocalAppearance
@@ -42,14 +42,24 @@ import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
 @Composable
+fun isDownloadedState(mediaId: String): Boolean {
+    var isDownloaded by remember { mutableStateOf(false) }
+    LaunchedEffect(mediaId) {
+        Database.instance.song(mediaId).collect { isDownloaded = it?.isDownloaded == true }
+    }
+    return isDownloaded
+}
+
+@Composable
 fun PlaylistDownloadIcon(
     songs: ImmutableList<MediaItem>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    parentName: String? = null
 ) {
     val context = LocalContext.current
     val (colorPalette) = LocalAppearance.current
 
-    val isDownloading by downloadState.collectAsState()
+    val isDownloading by ziDownloadState.collectAsState()
 
     AnimatedContent(
         targetState = isDownloading,
@@ -60,16 +70,13 @@ fun PlaylistDownloadIcon(
             currentIsDownloading -> CircularProgressIndicator(modifier = Modifier.size(18.dp))
 
             !songs.map { it.mediaId }.fastAll {
-                isCached(
-                    mediaId = it,
-                    key = isDownloading
-                )
+                isDownloadedState(mediaId = it)
             } -> HeaderIconButton(
                 icon = R.drawable.download,
                 color = colorPalette.text,
                 onClick = {
                     songs.forEach {
-                        PrecacheService.scheduleCache(context.applicationContext, it)
+                        ZiDownloadService.scheduleDownload(context.applicationContext, it, parentName)
                     }
                 },
                 modifier = modifier
