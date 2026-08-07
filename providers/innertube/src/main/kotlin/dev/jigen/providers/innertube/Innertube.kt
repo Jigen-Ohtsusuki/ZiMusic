@@ -52,7 +52,9 @@ object Innertube {
         while (true) {
             try {
                 return block()
-            } catch (e: IOException) {
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (e is io.ktor.client.plugins.ClientRequestException) throw e // 4xx errors
                 attempt++
                 if (attempt >= maxAttempts) throw e
                 delay(currentDelay)

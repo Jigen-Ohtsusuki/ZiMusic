@@ -32,8 +32,8 @@ suspend fun Innertube.relatedPage(body: NextBody) = runCatchingCancellable {
         ?.tabbedRenderer
         ?.watchNextTabbedResultsRenderer
         ?.tabs
-        ?.getOrNull(2)
-        ?.tabRenderer
+        ?.mapNotNull { it.tabRenderer }
+        ?.find { it.title?.equals("Related", ignoreCase = true) == true }
         ?.endpoint
         ?.browseEndpoint
         ?.browseId

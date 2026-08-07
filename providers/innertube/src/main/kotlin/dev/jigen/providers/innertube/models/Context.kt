@@ -161,48 +161,53 @@ data class Context(
                     )
                 )
             }
-        // Removed the DEFAULT_VISITOR_DATA constant
-        // This is the correct way to fix the issue.
-
         val DefaultWeb get() = DefaultWebNoLang.withLang
 
         val DefaultWebNoLang = Context(
             client = Client(
                 clientId = 67,
                 clientName = "WEB_REMIX",
-                clientVersion = "1.20260213.01.00",
+                clientVersion = "1.20250219.01.00",
                 platform = "DESKTOP",
                 userAgent = UserAgents.DESKTOP,
                 referer = "https://music.youtube.com/",
+                timeZone = "UTC",
+                utcOffsetMinutes = 0,
                 music = true
             )
         )
 
         val DefaultIOS = Context(
             client = Client(
-                clientId = 5,
-                clientName = "IOS",
-                clientVersion = "21.03.1",
+                clientId = 26,
+                clientName = "IOS_MUSIC",
+                clientVersion = "7.25.1",
                 deviceMake = "Apple",
-                deviceModel = "iPhone16,2",
-                osName = "iPhone",
-                osVersion = "18.2.22C152",
+                deviceModel = "iPhone10,4",
+                osName = "iOS",
+                osVersion = "16.7.7.20H330",
                 acceptHeader = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
                 userAgent = UserAgents.IOS,
+                timeZone = "UTC",
+                utcOffsetMinutes = 0,
                 music = true
             )
         )
 
         val DefaultAndroid = Context(
             client = Client(
-                clientId = 3,
-                clientName = "ANDROID",
-                clientVersion = "21.03.38",
+                clientId = 21,
+                clientName = "ANDROID_MUSIC",
+                clientVersion = "7.24.51",
+                deviceMake = "Samsung",
+                deviceModel = "SM-S908E",
                 osName = "Android",
-                osVersion = "14",
+                osVersion = "16",
                 platform = "MOBILE",
-                androidSdkVersion = 34,
+                androidSdkVersion = 36,
                 userAgent = UserAgents.ANDROID,
+                timeZone = "UTC",
+                utcOffsetMinutes = 0,
                 music = true
             )
         )
@@ -212,39 +217,92 @@ data class Context(
                 clientId = 85,
                 clientName = "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
                 clientVersion = "2.0",
+                platform = "TV",
                 userAgent = UserAgents.TV,
                 referer = "https://www.youtube.com/",
+                timeZone = "UTC",
+                utcOffsetMinutes = 0,
                 music = true
             )
         )
 
         val WebCreator = Context(
             client = Client(
-                clientName = "WEB_CREATOR",
-                clientVersion = "1.20260213.00.00",
                 clientId = 62,
+                clientName = "WEB_CREATOR",
+                clientVersion = "1.20241203.01.00",
+                platform = "DESKTOP",
                 userAgent = UserAgents.DESKTOP,
+                timeZone = "UTC",
+                utcOffsetMinutes = 0,
                 music = true
-
             )
         )
 
         val OnlyWeb = Context(
             client = Client(
-                clientName = "WEB",
-                clientVersion = "2.20260213.00.00",
                 clientId = 1,
+                clientName = "WEB",
+                clientVersion = "2.20260623.01.00",
+                platform = "DESKTOP",
                 userAgent = UserAgents.DESKTOP,
+                referer = "https://www.youtube.com/",
+                timeZone = "UTC",
+                utcOffsetMinutes = 0,
                 music = true
             )
         )
 
         val DefaultVR = Context(
             client = Client(
-                clientName = "ANDROID_VR",
-                clientVersion = "1.61.48",
                 clientId = 28,
-                userAgent = "com.google.android.apps.youtube.vr.oculus/1.61.48 (Linux; U; Android 12; en_US; Oculus Quest 3; Build/SQ3A.220605.009.A1; Cronet/132.0.6808.3)"
+                clientName = "ANDROID_VR",
+                clientVersion = "1.65.10",
+                deviceMake = "Oculus",
+                deviceModel = "Quest 3",
+                osName = "Android",
+                osVersion = "12L",
+                platform = "MOBILE",
+                androidSdkVersion = 32,
+                userAgent = "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip",
+                timeZone = "UTC",
+                utcOffsetMinutes = 0
+            )
+        )
+        
+        // Standard YouTube (non-Music) clients
+        val YouTubeAndroid = Context(
+            client = Client(
+                clientId = 3,
+                clientName = "ANDROID",
+                clientVersion = "21.03.36",
+                deviceMake = "Samsung",
+                deviceModel = "SM-S908E",
+                osName = "Android",
+                osVersion = "16",
+                platform = "MOBILE",
+                androidSdkVersion = 36,
+                userAgent = UserAgents.YOUTUBE_ANDROID,
+                timeZone = "UTC",
+                utcOffsetMinutes = 0,
+                music = false
+            )
+        )
+
+        val YouTubeIOS = Context(
+            client = Client(
+                clientId = 5,
+                clientName = "IOS",
+                clientVersion = "20.11.6",
+                deviceMake = "Apple",
+                deviceModel = "iPhone10,4",
+                osName = "iOS",
+                osVersion = "16.7.7.20H330",
+                acceptHeader = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                userAgent = UserAgents.YOUTUBE_IOS,
+                timeZone = "UTC",
+                utcOffsetMinutes = 0,
+                music = false
             )
         )
     }
@@ -263,7 +321,9 @@ val validCountryCodes =
 @Suppress("MaximumLineLength")
 object UserAgents {
     const val DESKTOP = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0"
-    const val ANDROID = "com.google.android.youtube/21.03.38 (Linux; U; Android 14) gzip"
-    const val IOS = "com.google.ios.youtube/21.03.1 (iPhone16,2; U; CPU iOS 18_2 like Mac OS X;)"
+    const val ANDROID = "com.google.android.apps.youtube.music/7.24.51 (Linux; U; Android 16; en_US; SM-S908E Build/TP1A.220624.014) gzip"
+    const val IOS = "com.google.ios.youtubemusic/7.25.1 (iPhone10,4; U; CPU iOS 16_7_7 like Mac OS X;)"
+    const val YOUTUBE_ANDROID = "com.google.android.youtube/21.03.36(Linux; U; Android 16; en_US; SM-S908E Build/TP1A.220624.014) gzip"
+    const val YOUTUBE_IOS = "com.google.ios.youtube/20.11.6 (iPhone10,4; U; CPU iOS 16_7_7 like Mac OS X;)"
     const val TV = "Mozilla/5.0 (PlayStation; PlayStation 4/12.02) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.4 Safari/605.1.15"
 }
