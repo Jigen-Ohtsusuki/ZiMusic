@@ -110,7 +110,7 @@ fun LogsList(modifier: Modifier = Modifier) = Box(modifier = modifier.fillMaxSiz
         }
         if (logs.isEmpty() || firstVisibleItemIndex > 1) return@LaunchedEffect
 
-        state.smoothScrollToTop()
+        state.animateScrollToItem(0)
     }
 
     LazyColumn(
@@ -148,6 +148,8 @@ fun LogsList(modifier: Modifier = Modifier) = Box(modifier = modifier.fillMaxSiz
         lazyListState = state,
         scrollIcon = R.drawable.chevron_down,
         icon = R.drawable.share_social,
+        iconAlwaysVisible = true,
+        reverse = true,
         onClick = {
             val extras = ActivityIntentBundleAccessor.bundle {
                 text = logs.joinToString(separator = "\n") {

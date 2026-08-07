@@ -149,6 +149,7 @@ fun logcat(): ImmutableList<Logcat> {
         Logcat.logAsFlow().onFirst {
             lines.clear()
         }.collect {
+            if (it is Logcat.FormattedLine && it.tag == "Choreographer") return@collect
             lines += it
             if (lines.size > 8192) lines.removeAt(0)
         }

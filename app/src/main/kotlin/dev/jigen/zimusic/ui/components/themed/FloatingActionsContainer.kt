@@ -39,6 +39,7 @@ fun BoxScope.FloatingActionsContainerWithScrollToTop(
     onClick: (() -> Unit)? = null,
     onScrollToTop: (suspend () -> Unit)? = lazyGridState::smoothScrollToTop,
     reverse: Boolean = false,
+    iconAlwaysVisible: Boolean = false,
     insets: WindowInsets = LocalPlayerAwareWindowInsets.current
 ) = FloatingActions(
     state = if (visible) lazyGridState.scrollingInfo() else null,
@@ -47,6 +48,7 @@ fun BoxScope.FloatingActionsContainerWithScrollToTop(
     icon = icon,
     scrollIcon = scrollIcon,
     onClick = onClick,
+    iconAlwaysVisible = iconAlwaysVisible,
     insets = insets,
     modifier = modifier
 )
@@ -61,6 +63,7 @@ fun BoxScope.FloatingActionsContainerWithScrollToTop(
     onClick: (() -> Unit)? = null,
     onScrollToTop: (suspend () -> Unit)? = lazyListState::smoothScrollToTop,
     reverse: Boolean = false,
+    iconAlwaysVisible: Boolean = false,
     insets: WindowInsets = LocalPlayerAwareWindowInsets.current
 ) = FloatingActions(
     state = if (visible) lazyListState.scrollingInfo() else null,
@@ -69,6 +72,7 @@ fun BoxScope.FloatingActionsContainerWithScrollToTop(
     icon = icon,
     scrollIcon = scrollIcon,
     onClick = onClick,
+    iconAlwaysVisible = iconAlwaysVisible,
     insets = insets,
     modifier = modifier
 )
@@ -83,6 +87,7 @@ fun BoxScope.FloatingActionsContainerWithScrollToTop(
     onClick: (() -> Unit)? = null,
     onScrollToTop: (suspend () -> Unit)? = scrollState::smoothScrollToTop,
     reverse: Boolean = false,
+    iconAlwaysVisible: Boolean = false,
     insets: WindowInsets = LocalPlayerAwareWindowInsets.current
 ) = FloatingActions(
     state = if (visible) scrollState.scrollingInfo() else null,
@@ -91,6 +96,7 @@ fun BoxScope.FloatingActionsContainerWithScrollToTop(
     icon = icon,
     scrollIcon = scrollIcon,
     onClick = onClick,
+    iconAlwaysVisible = iconAlwaysVisible,
     insets = insets,
     modifier = modifier
 )
@@ -104,6 +110,7 @@ private fun BoxScope.FloatingActions(
     reverse: Boolean = false,
     @DrawableRes icon: Int? = null,
     @DrawableRes scrollIcon: Int? = R.drawable.chevron_up,
+    iconAlwaysVisible: Boolean = false,
     onClick: (() -> Unit)? = null
 ) = Row(
     horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -142,7 +149,7 @@ private fun BoxScope.FloatingActions(
     icon?.let {
         onClick?.let {
             transition.AnimatedVisibility(
-                visible = { it?.isScrollingDown == false },
+                visible = { iconAlwaysVisible || it?.isScrollingDown == false },
                 enter = slideInVertically(
                     animationSpec = tween(durationMillis = 500, delayMillis = 0),
                     initialOffsetY = { it }
@@ -155,7 +162,7 @@ private fun BoxScope.FloatingActions(
                 PrimaryButton(
                     icon = icon,
                     onClick = onClick,
-                    enabled = transition.targetState?.isScrollingDown == false,
+                    enabled = iconAlwaysVisible || transition.targetState?.isScrollingDown == false,
                     modifier = Modifier
                         .padding(bottom = 16.dp)
                         .padding(bottomPaddingValues)
