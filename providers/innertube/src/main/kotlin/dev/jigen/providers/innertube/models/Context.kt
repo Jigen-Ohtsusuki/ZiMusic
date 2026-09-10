@@ -305,6 +305,22 @@ data class Context(
                 music = false
             )
         )
+
+        val DefaultVisionOS = Context(
+            client = Client(
+                clientId = 101,
+                clientName = "VISIONOS",
+                clientVersion = "0.1",
+                deviceMake = "Apple",
+                deviceModel = "RealityDevice14,1",
+                osName = "visionOS",
+                osVersion = "1.3.21O771",
+                userAgent = UserAgents.VISIONOS,
+                timeZone = "UTC",
+                utcOffsetMinutes = 0,
+                music = false
+            )
+        )
     }
 }
 
@@ -326,4 +342,5 @@ object UserAgents {
     const val YOUTUBE_ANDROID = "com.google.android.youtube/21.03.36(Linux; U; Android 16; en_US; SM-S908E Build/TP1A.220624.014) gzip"
     const val YOUTUBE_IOS = "com.google.ios.youtube/20.11.6 (iPhone10,4; U; CPU iOS 16_7_7 like Mac OS X;)"
     const val TV = "Mozilla/5.0 (PlayStation; PlayStation 4/12.02) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.4 Safari/605.1.15"
+    const val VISIONOS = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
 }

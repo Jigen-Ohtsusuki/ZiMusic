@@ -6,7 +6,6 @@ import io.ktor.http.URLBuilder
 import io.ktor.http.parseQueryString
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.schabi.newpipe.extractor.NewPipe
-import org.schabi.newpipe.extractor.downloader.CancellableCall
 import org.schabi.newpipe.extractor.downloader.Downloader
 import org.schabi.newpipe.extractor.downloader.Request
 import org.schabi.newpipe.extractor.downloader.Response
@@ -56,13 +55,8 @@ private class NewPipeDownloaderImpl : Downloader() {
             response.message,
             response.headers.toMultimap(),
             responseBodyToReturn,
-            responseBodyToReturn?.toByteArray(),
             latestUrl
         )
-    }
-
-    override fun executeAsync(request: Request, callback: AsyncCallback?): CancellableCall? {
-        return null // Safe stub to prevent crashes
     }
 }
 

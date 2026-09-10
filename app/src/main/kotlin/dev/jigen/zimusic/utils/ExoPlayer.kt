@@ -22,30 +22,41 @@ import java.net.UnknownHostException
 import kotlin.math.pow
 import kotlin.random.Random
 
-class RangeHandlerDataSourceFactory(private val parent: DataSource.Factory) : DataSource.Factory {
-    class Source(private val parent: DataSource) : DataSource by parent {
-        override fun open(dataSpec: DataSpec) = runCatching {
-            parent.open(dataSpec)
+class RangeHandlerDataSourceFactory(private val parentFactory: DataSource.Factory) : DataSource.Factory {
+    inner class Source(private var current: DataSource) : DataSource {
+        override fun addTransferListener(transferListener: androidx.media3.datasource.TransferListener) {
+            current.addTransferListener(transferListener)
+        }
+
+        override fun open(dataSpec: DataSpec): Long = runCatching {
+            current.open(dataSpec)
         }.getOrElse { e ->
             if (
                 e.findCause<EOFException>() != null ||
                 e.findCause<InvalidResponseCodeException>()?.responseCode == 416
-            ) parent.open(
-                dataSpec
-                    .buildUpon()
-                    .setHttpRequestHeaders(
-                        dataSpec.httpRequestHeaders.filter {
-                            !it.key.equals("range", ignoreCase = true)
-                        }
-                    )
-                    .setLength(C.LENGTH_UNSET.toLong())
-                    .build()
-            )
-            else throw e
+            ) {
+                runCatching { current.close() }
+                current = parentFactory.createDataSource()
+                current.open(
+                    dataSpec
+                        .buildUpon()
+                        .setHttpRequestHeaders(
+                            dataSpec.httpRequestHeaders.filter {
+                                !it.key.equals("range", ignoreCase = true)
+                            }
+                        )
+                        .setLength(C.LENGTH_UNSET.toLong())
+                        .build()
+                )
+            } else throw e
         }
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int = current.read(buffer, offset, length)
+        override fun getUri(): android.net.Uri? = current.uri
+        override fun close() = current.close()
     }
 
-    override fun createDataSource() = Source(parent.createDataSource())
+    override fun createDataSource() = Source(parentFactory.createDataSource())
 }
 
 class CatchingDataSourceFactory(
@@ -97,21 +108,32 @@ class FallbackDataSourceFactory(
     private val upstream: DataSource.Factory,
     private val fallback: DataSource.Factory
 ) : DataSource.Factory {
-    inner class Source(private val parent: DataSource) : DataSource by parent {
-        override fun open(dataSpec: DataSpec) = runCatching {
-            parent.open(dataSpec)
+    inner class Source(private var current: DataSource) : DataSource {
+        override fun addTransferListener(transferListener: androidx.media3.datasource.TransferListener) {
+            current.addTransferListener(transferListener)
+        }
+
+        override fun open(dataSpec: DataSpec): Long = runCatching {
+            current.open(dataSpec)
         }.getOrElse { ex ->
             ex.printStackTrace()
             Log.w(TAG, "Primary source failed, trying fallback: ${ex.message}")
 
+            runCatching { current.close() }
+
+            current = fallback.createDataSource()
             runCatching {
-                fallback.createDataSource().open(dataSpec)
+                current.open(dataSpec)
             }.getOrElse { fallbackEx ->
                 fallbackEx.printStackTrace()
                 Log.e(TAG, "Fallback source also failed: ${fallbackEx.message}")
                 throw ex
             }
         }
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int = current.read(buffer, offset, length)
+        override fun getUri(): android.net.Uri? = current.uri
+        override fun close() = current.close()
     }
 
     override fun createDataSource() = Source(upstream.createDataSource())
@@ -133,13 +155,23 @@ class RetryingDataSourceFactory(
     private val exponential: Boolean,
     private val predicate: (Throwable) -> Boolean
 ) : DataSource.Factory {
-    inner class Source(private val parent: DataSource) : DataSource by parent {
+    inner class Source(private var delegate: DataSource) : DataSource by delegate {
+        // Delegate read/uri/close through the current delegate (may change between retries)
+        override fun read(buffer: ByteArray, offset: Int, length: Int) = delegate.read(buffer, offset, length)
+        override fun getUri() = delegate.uri
+        override fun close() = delegate.close()
+
         override fun open(dataSpec: DataSpec): Long {
             var lastException: Throwable? = null
             var retries = 0
             while (retries <= maxRetries) {
                 if (retries > 0) {
                     Log.d(TAG, "Retry $retries of $maxRetries fetching datasource")
+
+                    // Close & discard the previous (partially-opened) source before sleeping,
+                    // then create a fresh one so DefaultDataSource's opened-state check passes.
+                    runCatching { delegate.close() }
+                    delegate = parent.createDataSource()
 
                     // Add jitter to prevent thundering herd
                     val baseDelay = if (exponential) 1000L * 2.0.pow(retries - 1).toLong() else 2500L
@@ -152,7 +184,7 @@ class RetryingDataSourceFactory(
 
                 @Suppress("TooGenericExceptionCaught")
                 return try {
-                    parent.open(dataSpec)
+                    delegate.open(dataSpec)
                 } catch (ex: Throwable) {
                     lastException = ex
                     if (printStackTrace) Log.e(
@@ -161,9 +193,9 @@ class RetryingDataSourceFactory(
                         ex
                     )
 
-                    // Don't retry certain unrecoverable errors
+                    // Don't retry certain unrecoverable errors unless the predicate allows it
                     val responseCode = ex.findCause<InvalidResponseCodeException>()?.responseCode
-                    if (responseCode in listOf(401, 403, 404, 410)) {
+                    if (responseCode in listOf(401, 404)) {
                         Log.e(TAG, "Unrecoverable HTTP error $responseCode, not retrying")
                         throw ex
                     }

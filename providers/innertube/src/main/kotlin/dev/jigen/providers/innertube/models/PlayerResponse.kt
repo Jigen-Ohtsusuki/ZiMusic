@@ -2,6 +2,7 @@ package dev.jigen.providers.innertube.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /**
  * PlayerResponse with [dev.jigen.providers.innertube.models.Context.DefaultWebNoLang] client
@@ -15,6 +16,9 @@ data class PlayerResponse(
     @SerialName("playbackTracking")
     val playbackTracking: PlaybackTracking?,
 ) {
+    @Transient
+    var userAgent: String? = null
+
     @Serializable
     data class PlayabilityStatus(
         val status: String,

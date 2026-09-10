@@ -9,7 +9,7 @@ agp = "9.2.1"
 
 loggingInterceptor = "5.1.0"
 material = "1.11.3"
-pipepipeextractor = "2d2d9ed"
+newpipeextractor = "v0.26.5"
 room = "2.8.4"
 media3 = "1.10.1"
 ktor = "3.2.2"
@@ -58,7 +58,7 @@ kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 logging-interceptor = { module = "com.squareup.okhttp3:logging-interceptor", version.ref = "loggingInterceptor" }
 material = { module = "androidx.compose.material:material", version.ref = "material" }
-pipepipeextractor = { module = "com.github.mostafaalagamy.MetrolistExtractor:PipePipeExtractor", version.ref = "pipepipeextractor" }
+pipepipeextractor = { module = "com.github.TeamNewPipe:NewPipeExtractor", version.ref = "newpipeextractor" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "converterGson" }
 room = { module = "androidx.room:room-ktx", version.ref = "room" }
 room_compiler = { module = "androidx.room:room-compiler", version.ref = "room" }

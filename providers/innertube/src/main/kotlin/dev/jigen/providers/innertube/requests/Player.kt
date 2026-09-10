@@ -27,7 +27,7 @@ private val streamValidatorClient by lazy {
         .build()
 }
 
-private val MAIN_CONTEXT = Context.DefaultIOS
+private val MAIN_CONTEXT = Context.DefaultVisionOS
 
 private val FALLBACK_CONTEXTS = arrayOf(
     Context.DefaultVR,
@@ -54,13 +54,21 @@ private val PlayerResponse.StreamingData.highestQualityFormat: PlayerResponse.St
                 .thenBy { it.mimeType.contains("webm") }
         )
 
-private fun validateStreamUrl(url: String, userAgent: String?): Boolean {
+private fun validateStreamUrl(url: String, userAgent: String?, clientName: String): Boolean {
     return try {
-        val requestBuilder = Request.Builder().url(url).head()
+        val requestBuilder = Request.Builder()
+            .url(url)
+            .get()
+            .header("Range", "bytes=0-1")
         userAgent?.let { requestBuilder.header("User-Agent", it) }
         val response = streamValidatorClient.newCall(requestBuilder.build()).execute()
-        response.isSuccessful.also { response.close() }
-    } catch (_: Exception) {
+        val isSuccess = response.isSuccessful
+        if (!isSuccess) {
+            System.err.println("Validation failed for $clientName with code ${response.code} and message ${response.message}")
+        }
+        isSuccess.also { response.close() }
+    } catch (e: Exception) {
+        System.err.println("Validation exception for $clientName: ${e.message}")
         false
     }
 }
@@ -91,7 +99,9 @@ private suspend fun Innertube.getPlayerResponse(
         httpResponse.bodyAsText()
     }
 
-    json.decodeFromString<PlayerResponse>(responseAsText)
+    val response = json.decodeFromString<PlayerResponse>(responseAsText)
+    response.userAgent = context.client.userAgent
+    response
 }
 
 suspend fun Innertube.player(body: PlayerBody): Result<PlayerResponse?>? = runCatchingCancellable {
@@ -116,7 +126,7 @@ suspend fun Innertube.player(body: PlayerBody): Result<PlayerResponse?>? = runCa
         val format = mainPlayerResponse.streamingData?.highestQualityFormat
         if (format != null) {
             val streamUrl = NewPipeUtils.getStreamUrl(format, body.videoId).getOrNull()
-            if (streamUrl != null && validateStreamUrl(streamUrl, MAIN_CONTEXT.client.userAgent)) {
+            if (streamUrl != null && validateStreamUrl(streamUrl, MAIN_CONTEXT.client.userAgent, MAIN_CONTEXT.client.clientName)) {
                 logger.info("Success! Found working stream with ${MAIN_CONTEXT.client.clientName}")
                 return@runCatchingCancellable mainPlayerResponse
             }
@@ -141,9 +151,10 @@ suspend fun Innertube.player(body: PlayerBody): Result<PlayerResponse?>? = runCa
                         val streamUrl = NewPipeUtils.getStreamUrl(format, body.videoId).getOrNull()
                         if (streamUrl != null) {
                             logger.info("Validating stream from ${context.client.clientName}...")
-                            if (validateStreamUrl(streamUrl, context.client.userAgent)) {
+                            if (validateStreamUrl(streamUrl, context.client.userAgent, context.client.clientName)) {
                                 logger.info("Success! Found working stream with ${context.client.clientName}")
                                 val finalResponse = mainPlayerResponse?.copy(streamingData = currentPlayerResponse.streamingData) ?: currentPlayerResponse
+                                finalResponse.userAgent = currentPlayerResponse.userAgent
                                 resultChannel.trySend(finalResponse)
                             }
                         }

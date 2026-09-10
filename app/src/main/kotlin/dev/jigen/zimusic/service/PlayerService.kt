@@ -36,6 +36,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.audio.AudioProcessor
+import androidx.media3.common.util.Log
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
@@ -1106,7 +1107,10 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
     companion object {
         private const val DEFAULT_CACHE_DIRECTORY = "exoplayer"
-        private const val DEFAULT_CHUNK_LENGTH = 512 * 1024L
+        // 100MB chunk length ensures the entire song is fetched in a single bounded Range request
+        // e.g. Range: bytes=0-104857599. This satisfies YouTube's rqh=1 bounded request requirement
+        // while bypassing the strict chunk tracking that causes 403s on subsequent chunks.
+        private const val DEFAULT_CHUNK_LENGTH = 100 * 1024 * 1024L
 
         fun createDatabaseProvider(context: Context) = StandaloneDatabaseProvider(context)
         fun createCache(
@@ -1132,7 +1136,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             context: Context,
             cache: Cache,
             chunkLength: Long? = DEFAULT_CHUNK_LENGTH,
-            uriCache: UriCache<String, Long?> = UriCache()
+            uriCache: UriCache<String, Pair<Long?, String?>> = UriCache()
         ): DataSource.Factory = ResolvingDataSource.Factory(
             ConditionalCacheDataSourceFactory(
                 cacheDataSourceFactory = cache.asDataSource,
@@ -1155,10 +1159,8 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
                 val start = dataSpec.uriPositionOffset
                 val length = (contentLength - start).coerceAtMost(chunkLength)
-                val rangeText = "$start-${start + length}"
 
                 this.subrange(start, length)
-                    .withAdditionalHeaders(mapOf("Range" to "bytes=$rangeText"))
             } ?: this
 
             if (
@@ -1171,32 +1173,44 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                     )
             ) dataSpec
             else uriCache[requestedMediaId]?.let { cachedUri ->
-                dataSpec
+                val (cachedContentLength, cachedUserAgent) = cachedUri.meta
+                val spec = dataSpec
                     .withUri(cachedUri.uri)
-                    .ranged(cachedUri.meta)
+                    .ranged(cachedContentLength)
+                if (cachedUserAgent != null) {
+                    spec.withAdditionalHeaders(mapOf("User-Agent" to cachedUserAgent))
+                } else spec
             } ?: run {
-                val (url, contentLength) = runBlocking(Dispatchers.IO) {
+                val (url, contentLength, userAgent) = runBlocking(Dispatchers.IO) {
                     val body = Innertube.player(PlayerBody(videoId = requestedMediaId))?.getOrThrow()
                         ?: throw Exception("API response was null.")
                     val format = body.streamingData?.highestQualityFormat
                         ?: throw Exception("Could not find a playable audio format in the response.")
                     val finalUrl = format.findUrl(requestedMediaId)
                         ?: throw Exception("Failed to generate a playable URL from the selected format.")
-                    Pair(finalUrl, format.contentLength)
+                    Triple(finalUrl, format.contentLength, body.userAgent)
                 }
 
                 val uri = url.toUri()
 
                 uriCache.push(
                     key = requestedMediaId,
-                    meta = contentLength,
+                    meta = Pair(contentLength, userAgent),
                     uri = uri,
-                    validUntil = Clock.System.now() + 24.hours
+                    validUntil = Clock.System.now() + 5.5.hours
                 )
 
-                dataSpec.buildUpon().setKey(requestedMediaId).build()
+                val spec = dataSpec.buildUpon().setKey(requestedMediaId).build()
                     .withUri(uri)
                     .ranged(contentLength)
+
+                if (userAgent != null) {
+                    Log.d("PlayerService", "Applying User-Agent for stream: $userAgent")
+                    spec.withAdditionalHeaders(mapOf("User-Agent" to userAgent))
+                } else {
+                    Log.w("PlayerService", "No User-Agent found for stream!")
+                    spec
+                }
             }
         }
             .handleUnknownErrors {

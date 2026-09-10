@@ -153,7 +153,15 @@ class ConditionalCacheDataSourceFactory(
         }
 
         override fun read(buffer: ByteArray, offset: Int, length: Int) =
-            source.read(buffer, offset, length)
+            runCatching {
+                source.read(buffer, offset, length)
+            }.getOrElse { ex ->
+                // If the cache file was deleted mid-read, reopen from upstream
+                if (ex.cause is java.io.FileNotFoundException || ex is java.io.FileNotFoundException) {
+                    source = createSource(upstreamDataSourceFactory)
+                    source.read(buffer, offset, length)
+                } else throw ex
+            }
 
         override fun addTransferListener(transferListener: TransferListener) {
             if (::selectedFactory.isInitialized) source.addTransferListener(transferListener)
@@ -170,10 +178,18 @@ class ConditionalCacheDataSourceFactory(
                 open.set(true)
                 source.open(dataSpec)
             }.getOrElse {
-                if (it is ReadOnlyException) {
-                    source = createSource(upstreamDataSourceFactory)
-                    source.open(dataSpec)
-                } else throw it
+                when {
+                    it is ReadOnlyException -> {
+                        source = createSource(upstreamDataSourceFactory)
+                        source.open(dataSpec)
+                    }
+                    // Stale cache entry: the cached file was deleted. Fall back to upstream.
+                    it.cause is java.io.FileNotFoundException || it is java.io.FileNotFoundException -> {
+                        source = createSource(upstreamDataSourceFactory)
+                        source.open(dataSpec)
+                    }
+                    else -> throw it
+                }
             }
         }
 

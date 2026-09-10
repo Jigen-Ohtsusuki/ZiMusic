@@ -280,8 +280,9 @@ class ZiDownloadService : Service() {
             if (!downloadsDir.exists()) downloadsDir.mkdirs()
             val file = File(downloadsDir, "${task.mediaId}.zdl")
 
-            var streamUrl    = ""
-            var targetLength = 0L
+            var streamUrl: String = ""
+            var targetLength: Long = 0
+            var streamUserAgent: String? = null
 
             suspend fun refreshStreamUrl() {
                 val result = Innertube.player(PlayerBody(videoId = task.mediaId))
@@ -289,6 +290,7 @@ class ZiDownloadService : Service() {
                 val format = body.streamingData?.highestQualityFormat ?: error("No format found")
                 streamUrl    = format.findUrl(task.mediaId) ?: error("URL could not be resolved")
                 targetLength = format.contentLength ?: error("Missing content length")
+                streamUserAgent = body.userAgent
             }
 
             refreshStreamUrl()
@@ -302,7 +304,8 @@ class ZiDownloadService : Service() {
                 var conn: HttpURLConnection? = null
                 try {
                     conn = URL(streamUrl).openConnection() as HttpURLConnection
-                    conn.setRequestProperty("User-Agent", "Mozilla/5.0")
+                    streamUserAgent?.let { conn.setRequestProperty("User-Agent", it) }
+                        ?: conn.setRequestProperty("User-Agent", "Mozilla/5.0")
                     conn.setRequestProperty("Range", "bytes=$downloaded-$endByte")
                     conn.connectTimeout = 15_000
                     conn.readTimeout    = 15_000

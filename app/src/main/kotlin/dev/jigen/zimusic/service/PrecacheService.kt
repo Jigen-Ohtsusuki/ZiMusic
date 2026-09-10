@@ -172,8 +172,7 @@ class PrecacheService : DownloadService(
             /* cache = */ cache,
             /* upstreamFactory = */ PlayerService.createYouTubeDataSourceResolverFactory(
                 context = this,
-                cache = cache,
-                chunkLength = null
+                cache = cache
             ),
             /* executor = */ executor
         ).apply {
