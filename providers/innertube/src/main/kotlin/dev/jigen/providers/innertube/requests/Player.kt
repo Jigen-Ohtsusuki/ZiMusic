@@ -13,19 +13,8 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.util.generateNonce
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.joinAll
-import kotlinx.coroutines.cancelChildren
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.isActive
-import okhttp3.Request
 
-private val streamValidatorClient by lazy {
-    YouTube.client.newBuilder()
-        .build()
-}
+
 
 private val MAIN_CONTEXT = Context.DefaultVisionOS
 
@@ -54,24 +43,7 @@ private val PlayerResponse.StreamingData.highestQualityFormat: PlayerResponse.St
                 .thenBy { it.mimeType.contains("webm") }
         )
 
-private fun validateStreamUrl(url: String, userAgent: String?, clientName: String): Boolean {
-    return try {
-        val requestBuilder = Request.Builder()
-            .url(url)
-            .get()
-            .header("Range", "bytes=0-1")
-        userAgent?.let { requestBuilder.header("User-Agent", it) }
-        val response = streamValidatorClient.newCall(requestBuilder.build()).execute()
-        val isSuccess = response.isSuccessful
-        if (!isSuccess) {
-            System.err.println("Validation failed for $clientName with code ${response.code} and message ${response.message}")
-        }
-        isSuccess.also { response.close() }
-    } catch (e: Exception) {
-        System.err.println("Validation exception for $clientName: ${e.message}")
-        false
-    }
-}
+
 
 private suspend fun Innertube.getPlayerResponse(
     body: PlayerBody,
@@ -126,59 +98,33 @@ suspend fun Innertube.player(body: PlayerBody): Result<PlayerResponse?>? = runCa
         val format = mainPlayerResponse.streamingData?.highestQualityFormat
         if (format != null) {
             val streamUrl = NewPipeUtils.getStreamUrl(format, body.videoId).getOrNull()
-            if (streamUrl != null && validateStreamUrl(streamUrl, MAIN_CONTEXT.client.userAgent, MAIN_CONTEXT.client.clientName)) {
+            if (streamUrl != null) {
                 logger.info("Success! Found working stream with ${MAIN_CONTEXT.client.clientName}")
                 return@runCatchingCancellable mainPlayerResponse
             }
         }
     }
 
-    logger.warn("Main client failed. Firing parallel fallback requests for ultimate speed...")
+    logger.warn("Main client failed. Trying fallback clients sequentially...")
 
-    // 2. Parallel Fallback Fetching
-    return@runCatchingCancellable coroutineScope {
-        val resultChannel = Channel<PlayerResponse?>(Channel.CONFLATED)
-
-        val jobs = FALLBACK_CONTEXTS.map { context ->
-            launch {
-                if (!isActive) return@launch
-                
-                val currentPlayerResponse = getPlayerResponse(bodyWithAuth, context).getOrNull()
-                
-                if (currentPlayerResponse != null && currentPlayerResponse.isValid) {
-                    val format = currentPlayerResponse.streamingData?.highestQualityFormat
-                    if (format != null) {
-                        val streamUrl = NewPipeUtils.getStreamUrl(format, body.videoId).getOrNull()
-                        if (streamUrl != null) {
-                            logger.info("Validating stream from ${context.client.clientName}...")
-                            if (validateStreamUrl(streamUrl, context.client.userAgent, context.client.clientName)) {
-                                logger.info("Success! Found working stream with ${context.client.clientName}")
-                                val finalResponse = mainPlayerResponse?.copy(streamingData = currentPlayerResponse.streamingData) ?: currentPlayerResponse
-                                finalResponse.userAgent = currentPlayerResponse.userAgent
-                                resultChannel.trySend(finalResponse)
-                            }
-                        }
-                    }
+    // 2. Sequential Fallback Fetching
+    for (context in FALLBACK_CONTEXTS) {
+        val currentPlayerResponse = getPlayerResponse(bodyWithAuth, context).getOrNull()
+        
+        if (currentPlayerResponse != null && currentPlayerResponse.isValid) {
+            val format = currentPlayerResponse.streamingData?.highestQualityFormat
+            if (format != null) {
+                val streamUrl = NewPipeUtils.getStreamUrl(format, body.videoId).getOrNull()
+                if (streamUrl != null) {
+                    logger.info("Success! Found working stream with ${context.client.clientName}")
+                    val finalResponse = mainPlayerResponse?.copy(streamingData = currentPlayerResponse.streamingData) ?: currentPlayerResponse
+                    finalResponse.userAgent = currentPlayerResponse.userAgent
+                    return@runCatchingCancellable finalResponse
                 }
             }
         }
-
-        launch {
-            jobs.joinAll()
-            // If we get here and all jobs finished without success, return null
-            resultChannel.trySend(null)
-        }
-
-        // Suspend until the first success is sent, or all jobs fail
-        val result = resultChannel.receive()
-        
-        if (result == null) {
-            logger.error("Could not find any working stream for videoId: ${body.videoId}")
-        }
-        
-        // Cancel any slower requests still pending in the background
-        coroutineContext.cancelChildren()
-        
-        result
     }
+
+    logger.error("Could not find any working stream for videoId: ${body.videoId}")
+    null
 }
