@@ -275,6 +275,8 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
     override fun onCreate() {
         super.onCreate()
 
+        dev.jigen.zimusic.service.DiscordIntegration.init(this, coroutineScope)
+
         glyphInterface.tryInit()
         notificationActionReceiver.register()
 
@@ -395,8 +397,37 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         super.onTaskRemoved(rootIntent)
     }
 
+    private fun updateDiscordPresence() {
+        if (!dev.jigen.zimusic.preferences.DiscordPreferences.enableDiscordRPC) return
+        val currentMediaItem = player.currentMediaItem ?: return
+        val playbackState = player.playbackState
+        if (playbackState == Player.STATE_ENDED) {
+            dev.jigen.zimusic.service.DiscordIntegration.clear()
+            return
+        }
+
+        val duration = player.duration.takeIf { it > 0L && it != C.TIME_UNSET }
+        val hasDurationText = !currentMediaItem.mediaMetadata.extras?.songBundle?.durationText.isNullOrBlank()
+        if (player.playWhenReady && playbackState == Player.STATE_BUFFERING && duration == null && !hasDurationText) {
+            return
+        }
+
+        val isPlaying = player.playWhenReady &&
+            playbackState != Player.STATE_ENDED &&
+            playbackState != Player.STATE_IDLE &&
+            player.playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_NONE
+        val currentPosition = player.currentPosition
+        dev.jigen.zimusic.service.DiscordIntegration.updatePresence(
+            mediaItem = currentMediaItem,
+            isPlaying = isPlaying,
+            currentPositionMs = currentPosition,
+            durationMs = duration
+        )
+    }
+
     override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) =
         maybeSavePlayerQueue()
+
 
     override fun onDestroy() {
         runCatching {
@@ -415,6 +446,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             loudnessEnhancer?.release()
             preferenceUpdaterJob?.cancel()
 
+            dev.jigen.zimusic.service.DiscordIntegration.clear()
             coroutineScope.cancel()
             glyphInterface.close()
         }
@@ -744,6 +776,19 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         )
 
         updatePlaybackState()
+
+        // Discord presence: single coalesced update per event batch
+        if (events.containsAny(
+                Player.EVENT_PLAY_WHEN_READY_CHANGED,
+                Player.EVENT_PLAYBACK_STATE_CHANGED,
+                Player.EVENT_IS_PLAYING_CHANGED,
+                Player.EVENT_MEDIA_ITEM_TRANSITION,
+                Player.EVENT_TIMELINE_CHANGED,
+                Player.EVENT_POSITION_DISCONTINUITY
+            )
+        ) {
+            updateDiscordPresence()
+        }
 
         if (
             !events.containsAny(

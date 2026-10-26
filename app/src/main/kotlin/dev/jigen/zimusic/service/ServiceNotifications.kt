@@ -83,12 +83,16 @@ abstract class NotificationChannels {
             notification: NotificationCompat.Builder.() -> NotificationCompat.Builder
         ) = runCatching {
             handler.post {
-                upsertChannel(context)
+                try {
+                    upsertChannel(context)
                 val (id, notif) = createNotification(context, notificationId, true, notification)
                 if (foregroundServiceType != 0 && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                     service.startForeground(id, notif, foregroundServiceType)
-                } else {
-                    service.startForeground(id, notif)
+                    } else {
+                        service.startForeground(id, notif)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
             }
         }
@@ -189,3 +193,4 @@ object ServiceNotifications : NotificationChannels() {
         setLightsEnabled(true).setVibrationEnabled(true)
     }
 }
+

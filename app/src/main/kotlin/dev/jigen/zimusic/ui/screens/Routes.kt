@@ -43,6 +43,7 @@ val moodRoute = Route1<Mood>("moodRoute")
 val searchResultRoute = Route1<String>("searchResultRoute")
 val searchRoute = Route1<String>("searchRoute")
 val settingsRoute = Route0("settingsRoute")
+val discordLoginRoute = Route0("discordLoginRoute")
 
 @Composable
 fun RouteHandlerScope.GlobalRoutes() {
@@ -72,6 +73,10 @@ fun RouteHandlerScope.GlobalRoutes() {
 
     settingsRoute {
         SettingsScreen()
+    }
+
+    discordLoginRoute {
+        dev.jigen.zimusic.ui.screens.settings.DiscordLoginScreen()
     }
 
     searchRoute { initialTextInput ->

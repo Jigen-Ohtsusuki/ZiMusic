@@ -371,4 +371,19 @@
         <item quantity="one">%1$d song</item>
         <item quantity="other">%1$d songs</item>
     </plurals>
+
+    <!-- Discord RPC -->
+    <string name="discord_connect_description">Sign in with Discord to share what you\'re listening to</string>
+    <string name="discord_status_connected">Connected</string>
+    <string name="discord_status_authorizing">Authorizing…</string>
+    <string name="discord_status_authorized">Authorized</string>
+    <string name="discord_status_not_initialized">Not initialized</string>
+    <string name="discord_error_loopback_timeout">Discord didn\'t respond in time. Please try again.</string>
+    <string name="discord_error_no_browser">No browser was found to complete Discord authorization.</string>
+    <string name="discord_error_token_refresh_failed">Discord session expired. Please reconnect.</string>
+    <string name="discord_error_invalid_scope">Discord rejected the connection. Please reconnect and grant the required permission.</string>
+    <string name="discord_integration">Discord Integration</string>
+    <string name="enable_discord_rpc">Enable Rich Presence</string>
+    <string name="discord_status">Status</string>
+
 </resources>

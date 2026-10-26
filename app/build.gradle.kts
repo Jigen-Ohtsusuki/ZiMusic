@@ -186,6 +186,7 @@ dependencies {
     implementation(projects.core.data)
     implementation(projects.core.ui)
     implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.websockets)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.datetime)
     detektPlugins(libs.detekt.compose)

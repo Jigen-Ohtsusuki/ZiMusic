@@ -87,6 +87,7 @@ val Song.asMediaItem: MediaItem
             MediaMetadata.Builder()
                 .setTitle(title)
                 .setArtist(artistsText)
+                .setAlbumTitle(album)
                 .setArtworkUri(thumbnailUrl?.toUri())
                 .setExtras(
                     SongBundleAccessor.bundle {

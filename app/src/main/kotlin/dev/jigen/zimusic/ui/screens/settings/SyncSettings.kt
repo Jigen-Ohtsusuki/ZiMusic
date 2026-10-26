@@ -331,6 +331,11 @@ fun SyncSettings(
 
     SettingsCategoryScreen(title = stringResource(R.string.sync)) {
         SettingsDescription(text = stringResource(R.string.sync_description))
+        
+        SettingsGroup(title = stringResource(R.string.discord_integration)) {
+            DiscordSettings(navController = null)
+        }
+
         SettingsGroup(title = stringResource(R.string.local_import)) {
             SettingsEntry(
                 title = stringResource(R.string.import_from_csv),

@@ -422,6 +422,15 @@ fun handleUrl(
     Log.d(TAG, "Opening url: $uri ($path)")
 
     coroutineScope.launch {
+        if (uri.scheme == "zimusicdiscord") {
+            val code = uri.getQueryParameter("code")
+            if (code != null) {
+                val state = uri.getQueryParameter("state")
+                if (state != null) dev.jigen.zimusic.discord.DiscordAuthFlow.complete(code, state)
+            }
+            return@launch
+        }
+
         when (path) {
             "search" -> uri.getQueryParameter("q")?.let { query ->
                 searchResultRoute.ensureGlobal(query)
