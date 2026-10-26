@@ -525,7 +525,7 @@ fun Lyrics(
         singleLine = false,
         maxLines = 10,
         isTextInputValid = { true },
-        onDismiss = { },
+        onDismiss = { editing = false },
         onAccept = {
             transaction {
                 runCatching {
@@ -561,8 +561,8 @@ fun Lyrics(
 
         LrcLibSearchDialog(
             query = query,
-            setQuery = { },
-            onDismiss = { },
+            setQuery = { query = it },
+            onDismiss = { picking = false },
             onPick = {
                 runCatching {
                     transaction {
@@ -969,6 +969,7 @@ fun Lyrics(
                                                 text = stringResource(R.string.pick_from_lrclib),
                                                 onClick = {
                                                     menuState.hide()
+                                                    picking = true
                                                 }
                                             )
                                             MenuEntry(
